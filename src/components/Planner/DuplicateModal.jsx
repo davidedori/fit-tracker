@@ -7,6 +7,11 @@ const DuplicateModal = ({ isOpen, onClose, onConfirm, currentDay }) => {
 
   if (!isOpen) return null
 
+  const handleConfirm = () => {
+    console.log('Duplicazione da giorno', currentDay, 'a giorno', selectedDay)
+    onConfirm(selectedDay)
+  }
+
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4">
       <div className="bg-white rounded-lg p-6 max-w-sm w-full">
@@ -33,7 +38,7 @@ const DuplicateModal = ({ isOpen, onClose, onConfirm, currentDay }) => {
             Annulla
           </Button>
           <Button 
-            onClick={() => onConfirm(selectedDay)}
+            onClick={handleConfirm}
             variant="primary"
           >
             Duplica

@@ -20,6 +20,7 @@ const Profile = () => {
     exerciseCount: 0,
     estimatedDuration: 0
   })
+  const [hasAnyExercises, setHasAnyExercises] = useState(true)
   const [loadingData, setLoadingData] = useState(true)
 
   const currentDay = new Date().getDay() || 7
@@ -72,6 +73,9 @@ const Profile = () => {
             mostUsedEquipment: mostUsed ? mostUsed[0] : '-',
             favoriteBodyPart: favorite ? favorite[0] : '-'
           })
+          
+          // Verifica se ci sono esercizi in qualsiasi giorno
+          setHasAnyExercises(allExercises.length > 0)
         }
       } catch (error) {
         console.error('Errore nel caricamento dei dati:', error)
@@ -112,7 +116,27 @@ const Profile = () => {
       {/* Box allenamento di oggi o pianificazione */}
       <div className="max-w-4xl mx-auto mb-8">
         <div className="bg-white rounded-lg shadow-sm p-6 hover:shadow-md transition-shadow">
-          {todayWorkout.exerciseCount > 0 ? (
+          {!hasAnyExercises ? (
+            <>
+              <div className="flex items-center gap-3 mb-6">
+                <div className="p-2 bg-blue-50 rounded-full">
+                  <Calendar className="h-6 w-6 text-blue-500" />
+                </div>
+                <h2 className="text-xl font-bold">Pianifica i tuoi allenamenti</h2>
+              </div>
+              <div className="flex items-center justify-between">
+                <p className="text-gray-600">
+                  Inizia a configurare la tua routine settimanale di allenamento
+                </p>
+                <Link 
+                  to="/planner"
+                  className="bg-blue-500 text-white px-6 py-3 rounded-lg hover:bg-blue-600 transition-colors flex items-center gap-2 font-medium"
+                >
+                  Pianifica <ArrowRight size={18} />
+                </Link>
+              </div>
+            </>
+          ) : todayWorkout.exerciseCount > 0 ? (
             <>
               <div className="flex items-center gap-3 mb-6">
                 <div className="p-2 bg-blue-50 rounded-full">
@@ -141,17 +165,17 @@ const Profile = () => {
                 <div className="p-2 bg-blue-50 rounded-full">
                   <Calendar className="h-6 w-6 text-blue-500" />
                 </div>
-                <h2 className="text-xl font-bold">Pianifica i tuoi allenamenti</h2>
+                <h2 className="text-xl font-bold">Nessun allenamento oggi</h2>
               </div>
               <div className="flex items-center justify-between">
                 <p className="text-gray-600">
-                  Inizia a configurare la tua routine settimanale di allenamento
+                  Non hai esercizi programmati per oggi, ma hai configurato altri giorni
                 </p>
                 <Link 
                   to="/planner"
                   className="bg-blue-500 text-white px-6 py-3 rounded-lg hover:bg-blue-600 transition-colors flex items-center gap-2 font-medium"
                 >
-                  Pianifica <ArrowRight size={18} />
+                  Modifica <ArrowRight size={18} />
                 </Link>
               </div>
             </>

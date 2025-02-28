@@ -60,6 +60,12 @@ const WeeklyPlanner = () => {
       const exercises = weeklyRoutine[sourceDay] || []
       const targetDayNum = parseInt(targetDay)
       
+      // Verifica che il giorno di origine e destinazione siano diversi
+      if (sourceDay === targetDayNum) {
+        console.error('Il giorno di origine e destinazione sono uguali')
+        return
+      }
+      
       for (const exercise of exercises) {
         const { error } = await supabase
           .from('exercises')
@@ -250,7 +256,7 @@ const WeeklyPlanner = () => {
             day={day}
             exercises={weeklyRoutine[day] || []}
             onSave={(exercise) => handleSaveExercise(day, exercise)}
-            onDuplicate={(targetDay) => handleDuplicate(day, targetDay)}
+            onDuplicate={handleDuplicate}
             onClear={() => handleClear(day)}
             onDeleteExercise={handleDeleteExercise}
             onEditExercise={handleEditExercise}
