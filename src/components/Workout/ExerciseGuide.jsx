@@ -98,8 +98,8 @@ const ExerciseGuide = ({ exercise, onComplete, totalExercises, currentExerciseIn
     return (
       <div className="bg-white rounded-lg p-6 space-y-6">
         <div className="text-center">
-          <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-            <Award className="h-10 w-10 text-green-500" />
+          <div className="w-16 h-16 sm:w-20 sm:h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-3 sm:mb-4">
+            <Award className="h-8 w-8 sm:h-10 sm:w-10 text-green-500" />
           </div>
           <h2 className="text-2xl font-bold mb-4">Esercizio Completato! 🎉</h2>
           <p className="text-lg mb-4">
@@ -107,8 +107,8 @@ const ExerciseGuide = ({ exercise, onComplete, totalExercises, currentExerciseIn
               ? "Preparati per il prossimo esercizio"
               : "Ultimo esercizio completato!"}
           </p>
-          <div className="w-24 h-24 rounded-full bg-blue-100 flex items-center justify-center mx-auto my-6">
-            <p className="text-4xl font-bold text-blue-500">{transitionTimer}</p>
+          <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-blue-100 flex items-center justify-center mx-auto my-4 sm:my-6">
+            <p className="text-3xl sm:text-4xl font-bold text-blue-500">{transitionTimer}</p>
           </div>
           <Button
             onClick={onComplete}
@@ -161,8 +161,8 @@ const ExerciseGuide = ({ exercise, onComplete, totalExercises, currentExerciseIn
               <span className="text-sm font-medium text-gray-500">Modalità Timer</span>
             </div>
             
-            <div className="w-36 h-36 rounded-full bg-blue-100 flex items-center justify-center mx-auto mb-6">
-              <p className="text-4xl font-bold text-blue-700">{formatTime(timer)}</p>
+            <div className="w-28 h-28 sm:w-36 sm:h-36 rounded-full bg-blue-100 flex items-center justify-center mx-auto mb-4 sm:mb-6">
+              <p className="text-3xl sm:text-4xl font-bold text-blue-700">{formatTime(timer)}</p>
             </div>
             
             <Button
@@ -198,8 +198,8 @@ const ExerciseGuide = ({ exercise, onComplete, totalExercises, currentExerciseIn
               <div className="space-y-4">
                 <div className="bg-yellow-50 p-4 rounded-lg">
                   <p className="text-xl mb-2 text-yellow-700">Riposo</p>
-                  <div className="w-24 h-24 rounded-full bg-yellow-100 flex items-center justify-center mx-auto">
-                    <p className="text-3xl font-bold text-yellow-700">{formatTime(timer)}</p>
+                  <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-yellow-100 flex items-center justify-center mx-auto">
+                    <p className="text-2xl sm:text-3xl font-bold text-yellow-700">{formatTime(timer)}</p>
                   </div>
                 </div>
                 <Button
