@@ -55,21 +55,28 @@ const WeeklyPlanner = () => {
   }
 
   const handleDuplicate = async (sourceDay, targetDay) => {
-    const exercises = weeklyRoutine[sourceDay] || []
-    
-    for (const exercise of exercises) {
-      const { error } = await supabase
-        .from('exercises')
-        .insert({
-          ...exercise,
-          id: undefined,
-          day_of_week: targetDay,
-          user_id: user.id
-        })
-      if (error) console.error('Errore durante la duplicazione:', error)
+    try {
+      console.log('handleDuplicate - sourceDay:', sourceDay, 'targetDay:', targetDay)
+      const exercises = weeklyRoutine[sourceDay] || []
+      const targetDayNum = parseInt(targetDay)
+      
+      for (const exercise of exercises) {
+        const { error } = await supabase
+          .from('exercises')
+          .insert({
+            ...exercise,
+            id: undefined,
+            day_of_week: targetDayNum,
+            user_id: user.id,
+            order_index: (weeklyRoutine[targetDayNum] || []).length
+          })
+        if (error) console.error('Errore durante la duplicazione:', error)
+      }
+      
+      await fetchRoutine()
+    } catch (error) {
+      console.error('Errore durante la duplicazione:', error)
     }
-    
-    await fetchRoutine()
   }
 
   const handleClear = async (day) => {
@@ -243,7 +250,7 @@ const WeeklyPlanner = () => {
             day={day}
             exercises={weeklyRoutine[day] || []}
             onSave={(exercise) => handleSaveExercise(day, exercise)}
-            onDuplicate={() => handleDuplicate(day, day === 7 ? 1 : day + 1)}
+            onDuplicate={(targetDay) => handleDuplicate(day, targetDay)}
             onClear={() => handleClear(day)}
             onDeleteExercise={handleDeleteExercise}
             onEditExercise={handleEditExercise}
