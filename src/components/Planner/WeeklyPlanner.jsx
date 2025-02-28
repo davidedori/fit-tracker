@@ -47,11 +47,42 @@ const WeeklyPlanner = () => {
     }
   }
 
-  const handleSaveExercise = async (day, exercise) => {
-    const updatedRoutine = { ...weeklyRoutine }
-    if (!updatedRoutine[day]) updatedRoutine[day] = []
-    updatedRoutine[day].push(exercise)
-    setWeeklyRoutine(updatedRoutine)
+  const handleSaveExercise = async (exercise) => {
+    try {
+      console.log('Tentativo di salvataggio esercizio:', exercise);
+      
+      // Prepara i dati dell'esercizio per il salvataggio
+      // Rimuoviamo l'id vuoto per permettere a Supabase di generarlo automaticamente
+      const { id, ...exerciseWithoutId } = exercise;
+      
+      const exerciseData = {
+        ...exerciseWithoutId,
+        user_id: user.id,
+        day_of_week: exercise.day_of_week,
+        duration: exercise.mode === 'timer' ? Math.max(0, parseInt(exercise.duration) || 0) : 0,
+        sets: exercise.mode === 'reps' ? (parseInt(exercise.sets) || 3) : 0,
+        reps: exercise.mode === 'reps' ? (parseInt(exercise.reps) || 10) : 0,
+        rest: parseInt(exercise.rest) || 0,
+        order_index: (weeklyRoutine[exercise.day_of_week] || []).length
+      }
+
+      console.log('Dati formattati per Supabase:', exerciseData);
+      
+      // Salva l'esercizio nel database
+      const { data, error } = await supabase
+        .from('exercises')
+        .insert(exerciseData)
+        .select()
+
+      if (error) throw error
+
+      console.log('Esercizio salvato con successo:', data);
+      
+      // Aggiorna lo stato locale dopo il salvataggio
+      await fetchRoutine()
+    } catch (error) {
+      console.error('Errore durante il salvataggio dell\'esercizio:', error)
+    }
   }
 
   const handleDuplicate = async (sourceDay, targetDay) => {
@@ -255,7 +286,7 @@ const WeeklyPlanner = () => {
             key={day}
             day={day}
             exercises={weeklyRoutine[day] || []}
-            onSave={(exercise) => handleSaveExercise(day, exercise)}
+            onSave={(exercise) => handleSaveExercise(exercise)}
             onDuplicate={handleDuplicate}
             onClear={() => handleClear(day)}
             onDeleteExercise={handleDeleteExercise}

@@ -3,62 +3,70 @@ import { Droppable, Draggable } from '@hello-pangea/dnd'
 import ExerciseForm from './ExerciseForm'
 import { dayNames } from '../../constants/days'
 import DuplicateModal from './DuplicateModal'
+import { Edit2, Trash2, Copy, Plus, MoreHorizontal, Clock, Tool } from 'react-feather'
 import Button from '../common/Button'
-import { Copy, Trash2, Edit2, Clock, Tool, Plus } from 'react-feather'
 
-const DayPlanner = ({ day, exercises, onDuplicate, onClear, onSave, onDeleteExercise, onEditExercise, onDuplicateExercise }) => {
+const DayPlanner = ({ 
+  day, 
+  exercises, 
+  onSave, 
+  onDuplicate, 
+  onClear, 
+  onDeleteExercise,
+  onEditExercise,
+  onDuplicateExercise
+}) => {
   const [showForm, setShowForm] = useState(false)
-  const [showDuplicateModal, setShowDuplicateModal] = useState(false)
-  const [selectedExercise, setSelectedExercise] = useState(null)
   const [editingExercise, setEditingExercise] = useState(null)
+  const [showDuplicateModal, setShowDuplicateModal] = useState(false)
 
   const handleSave = (exercise) => {
-    onSave(exercise)
+    onSave({
+      ...exercise,
+      day_of_week: day
+    })
     setShowForm(false)
   }
 
-  const handleClearConfirm = () => {
-    if (window.confirm('Sei sicuro di voler eliminare tutti gli esercizi di questo giorno?')) {
-      onClear(day)
-    }
-  }
-
-  const handleDuplicateClick = () => {
-    setShowDuplicateModal(true)
-  }
-
   return (
-    <div className="day-planner p-4 border rounded bg-white shadow-sm">
-      <h2 className="text-xl font-bold mb-4 flex items-center justify-between">
-        <span>{dayNames[day - 1]}</span>
-        <div className="flex space-x-2 flex-shrink-0">
-          <Button
-            onClick={handleDuplicateClick}
+    <div className="bg-white rounded-lg shadow-sm p-4">
+      <div className="flex justify-between items-center mb-4">
+        <h2 className="text-lg font-semibold">{dayNames[day - 1]}</h2>
+        <div className="flex space-x-2">
+          <Button 
+            onClick={() => setShowForm(true)} 
             variant="outline"
-            title="Duplica al giorno successivo"
-            className="p-2 text-blue-600"
-          >
-            <Copy size={20} />
-          </Button>
-          <Button
-            onClick={handleClearConfirm}
-            variant="danger"
-            title="Cancella tutti gli esercizi"
             className="p-2"
+            title="Aggiungi esercizio"
           >
-            <Trash2 size={20} />
+            <Plus size={16} />
           </Button>
+          {exercises.length > 0 && (
+            <>
+              <Button 
+                onClick={() => setShowDuplicateModal(true)} 
+                variant="outline"
+                className="p-2"
+                title="Duplica esercizi"
+              >
+                <Copy size={16} />
+              </Button>
+              <Button 
+                onClick={() => {
+                  if (window.confirm('Sei sicuro di voler eliminare tutti gli esercizi di questo giorno?')) {
+                    onClear()
+                  }
+                }} 
+                variant="outline"
+                className="p-2 text-red-500 hover:text-red-700"
+                title="Svuota giorno"
+              >
+                <Trash2 size={16} />
+              </Button>
+            </>
+          )}
         </div>
-      </h2>
-
-      <Button 
-        onClick={() => setShowForm(true)}
-        variant="outline"
-        fullWidth
-        className="mb-4 border-dashed"
-      >
-        <Plus size={16} className="mr-2" /> Aggiungi esercizio
-      </Button>
+      </div>
 
       <Droppable droppableId={`day-${day}`}>
         {(provided) => (
@@ -138,9 +146,20 @@ const DayPlanner = ({ day, exercises, onDuplicate, onClear, onSave, onDeleteExer
       </Droppable>
 
       {showForm && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg p-6 max-w-lg w-full">
-            <h3 className="text-lg font-bold mb-4">Aggiungi esercizio</h3>
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50 overflow-y-auto">
+          <div className="bg-white rounded-lg p-6 max-w-lg w-full max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-bold">Aggiungi esercizio</h3>
+              <button 
+                onClick={() => setShowForm(false)}
+                className="text-gray-500 hover:text-gray-700 focus:outline-none"
+                aria-label="Chiudi"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
             <ExerciseForm
               day={day}
               onSave={handleSave}
@@ -156,9 +175,20 @@ const DayPlanner = ({ day, exercises, onDuplicate, onClear, onSave, onDeleteExer
       )}
 
       {editingExercise && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg p-6 max-w-lg w-full">
-            <h3 className="text-lg font-bold mb-4">Modifica esercizio</h3>
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50 overflow-y-auto">
+          <div className="bg-white rounded-lg p-6 max-w-lg w-full max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-bold">Modifica esercizio</h3>
+              <button 
+                onClick={() => setEditingExercise(null)}
+                className="text-gray-500 hover:text-gray-700 focus:outline-none"
+                aria-label="Chiudi"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
             <ExerciseForm
               day={day}
               initialData={{
@@ -188,7 +218,6 @@ const DayPlanner = ({ day, exercises, onDuplicate, onClear, onSave, onDeleteExer
           isOpen={showDuplicateModal}
           onClose={() => setShowDuplicateModal(false)}
           onConfirm={(targetDay) => {
-            console.log('DayPlanner - duplicazione da giorno', day, 'a giorno', targetDay)
             onDuplicate(day, targetDay)
             setShowDuplicateModal(false)
           }}

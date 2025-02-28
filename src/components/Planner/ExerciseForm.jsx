@@ -17,7 +17,6 @@ const ExerciseForm = ({ day, onSave, initialData = null }) => {
   const { user } = useAuth()
   const [exercise, setExercise] = useState(() => {
     const defaultState = {
-      id: '',
       user_id: user.id,
       name: '',
       equipment: '',
@@ -29,15 +28,14 @@ const ExerciseForm = ({ day, onSave, initialData = null }) => {
       reps: 10,
       duration: 0,
       rest: 0,
-      order_index: 0
+      order_index: 0,
+      day_of_week: day
     }
 
     if (initialData) {
       return {
         ...defaultState,
         ...initialData,
-        id: initialData.id,
-        user_id: initialData.user_id,
         body_part: initialData.body_part || '',
         duration: initialData.mode === 'timer' ? parseInt(initialData.duration) || 0 : 0,
         sets: initialData.mode === 'reps' ? parseInt(initialData.sets) || 0 : defaultState.sets,
@@ -60,95 +58,103 @@ const ExerciseForm = ({ day, onSave, initialData = null }) => {
     { value: 'spalle', label: 'Spalle', icon: Heart }
   ]
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = (e) => {
     e.preventDefault()
-    try {
-      const exerciseData = {
-        ...exercise,
-        id: exercise.id,
-        user_id: exercise.user_id,
-        day_of_week: day,
-        body_part: exercise.body_part || '',
-        mode: exercise.mode,
-        duration: exercise.mode === 'timer' ? Math.max(0, parseInt(exercise.duration) || 0) : 0,
-        sets: exercise.mode === 'reps' ? Math.max(0, parseInt(exercise.sets) || 3) : 0,
-        reps: exercise.mode === 'reps' ? Math.max(0, parseInt(exercise.reps) || 10) : 0,
-        rest: Math.max(0, parseInt(exercise.rest) || 0),
-      }
-      console.log('Data being sent from form:', exerciseData)
-      onSave(exerciseData)
-    } catch (error) {
-      console.error('Errore durante il salvataggio:', error)
+    
+    // Assicuriamoci che day_of_week sia impostato correttamente
+    const exerciseToSave = {
+      ...exercise,
+      day_of_week: day
     }
+    
+    onSave(exerciseToSave)
   }
 
-  const handleBodyPartSelect = (e, value) => {
-    e.preventDefault()
-    setExercise({...exercise, body_part: value})
-  }
-
-  const handleModeChange = (newMode) => {
-    console.log('Changing mode to:', newMode)
-    console.log('Current exercise state:', exercise)
-    setExercise(prev => {
-      const updated = {
-        ...prev,
-        mode: newMode,
-        duration: newMode === 'timer' ? prev.duration : 0,
-        sets: newMode === 'reps' ? prev.sets : 0,
-        reps: newMode === 'reps' ? prev.reps : 0
-      }
-      console.log('Updated exercise state:', updated)
-      return updated
+  const handleModeChange = (mode) => {
+    setExercise({
+      ...exercise,
+      mode
     })
   }
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
-      <Input
-        type="text"
-        value={exercise.name}
-        onChange={(e) => setExercise({...exercise, name: e.target.value})}
-        placeholder="Nome esercizio"
-        className="text-xl font-semibold"
-        required
-      />
-
-      <Input
-        type="text"
-        value={exercise.equipment}
-        onChange={(e) => setExercise({...exercise, equipment: e.target.value})}
-        placeholder="Attrezzi necessari"
-        label="Attrezzi"
-      />
+      <div className="space-y-2">
+        <label className="block text-sm font-medium text-gray-700">
+          Nome esercizio:
+        </label>
+        <Input
+          value={exercise.name}
+          onChange={(e) => setExercise({
+            ...exercise,
+            name: e.target.value
+          })}
+          required
+        />
+      </div>
 
       <div className="space-y-2">
         <label className="block text-sm font-medium text-gray-700">
-          Seleziona distretto corporeo:
+          Descrizione (opzionale):
+        </label>
+        <textarea
+          value={exercise.description}
+          onChange={(e) => setExercise({
+            ...exercise,
+            description: e.target.value
+          })}
+          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+          rows="2"
+        />
+      </div>
+
+      <div className="space-y-2">
+        <label className="block text-sm font-medium text-gray-700">
+          Gruppo muscolare:
         </label>
         <div className="grid grid-cols-3 gap-2">
-          {bodyParts.map(part => {
+          {bodyParts.map((part) => {
             const Icon = part.icon
             return (
-              <Button
-                type="button"
+              <button
                 key={part.value}
-                onClick={() => setExercise({...exercise, body_part: part.value})}
-                variant={exercise.body_part === part.value ? 'primary' : 'outline'}
-                className="flex-col py-3"
+                type="button"
+                onClick={() => setExercise({
+                  ...exercise,
+                  body_part: part.value
+                })}
+                className={`flex flex-col items-center justify-center p-2 border rounded-md ${
+                  exercise.body_part === part.value
+                    ? 'bg-blue-50 border-blue-500 text-blue-700'
+                    : 'border-gray-300 text-gray-700 hover:bg-gray-50'
+                }`}
               >
-                <Icon size={24} className="mb-1" />
-                <span className="text-sm">{part.label}</span>
-              </Button>
+                <Icon size={20} className={exercise.body_part === part.value ? 'text-blue-500' : 'text-gray-500'} />
+                <span className="text-xs mt-1">{part.label}</span>
+              </button>
             )
           })}
         </div>
       </div>
 
       <div className="space-y-2">
+        <label className="block text-sm font-medium text-gray-700">
+          Attrezzatura (opzionale):
+        </label>
+        <Input
+          value={exercise.equipment}
+          onChange={(e) => setExercise({
+            ...exercise,
+            equipment: e.target.value
+          })}
+        />
+      </div>
+
+      <div className="space-y-2">
         <label className="block text-sm font-medium text-gray-700">Modalità:</label>
         <div className="grid grid-cols-2 gap-2">
           <Button
+            type="button"
             onClick={() => handleModeChange('timer')}
             variant={exercise.mode === 'timer' ? 'primary' : 'outline'}
             fullWidth
@@ -158,6 +164,7 @@ const ExerciseForm = ({ day, onSave, initialData = null }) => {
             Timer
           </Button>
           <Button
+            type="button"
             onClick={() => handleModeChange('reps')}
             variant={exercise.mode === 'reps' ? 'primary' : 'outline'}
             fullWidth
@@ -195,11 +202,11 @@ const ExerciseForm = ({ day, onSave, initialData = null }) => {
             </label>
             <Input
               type="number"
-              min="0"
+              min="1"
               value={exercise.sets}
               onChange={(e) => setExercise({
                 ...exercise,
-                sets: parseInt(e.target.value) || 0
+                sets: parseInt(e.target.value) || 1
               })}
               required={exercise.mode === 'reps'}
             />
@@ -210,11 +217,11 @@ const ExerciseForm = ({ day, onSave, initialData = null }) => {
             </label>
             <Input
               type="number"
-              min="0"
+              min="1"
               value={exercise.reps}
               onChange={(e) => setExercise({
                 ...exercise,
-                reps: parseInt(e.target.value) || 0
+                reps: parseInt(e.target.value) || 1
               })}
               required={exercise.mode === 'reps'}
             />
@@ -224,7 +231,7 @@ const ExerciseForm = ({ day, onSave, initialData = null }) => {
 
       <div className="space-y-2">
         <label className="block text-sm font-medium text-gray-700">
-          Riposo (secondi):
+          Tempo di riposo tra le serie (secondi):
         </label>
         <Input
           type="number"
@@ -237,19 +244,8 @@ const ExerciseForm = ({ day, onSave, initialData = null }) => {
         />
       </div>
 
-      <Input
-        type="textarea"
-        value={exercise.description}
-        onChange={(e) => setExercise({...exercise, description: e.target.value})}
-        placeholder="Descrizione"
-      />
-
-      <Button 
-        type="submit" 
-        fullWidth 
-        className="mt-4"
-      >
-        {initialData ? 'Modifica' : 'Aggiungi'}
+      <Button type="submit" variant="primary" fullWidth>
+        {initialData ? 'Aggiorna esercizio' : 'Aggiungi esercizio'}
       </Button>
     </form>
   )
