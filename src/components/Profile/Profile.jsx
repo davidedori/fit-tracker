@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { User, Activity, FileText, Tool, Target, Play, Edit, LogOut } from 'react-feather'
+import { User, Activity, FileText, Tool, Target, Play, Edit, LogOut, BarChart2 } from 'react-feather'
 import { useAuth } from '../../contexts/AuthContext'
 import { supabase } from '../../services/supabase'
 import StatCard from '../common/StatCard'
@@ -76,6 +76,18 @@ const Profile = () => {
           
           // Verifica se ci sono esercizi in qualsiasi giorno
           setHasAnyExercises(allExercises.length > 0)
+        }
+
+        // Carica il conteggio degli allenamenti completati
+        const { data: workoutLogs, error: workoutError } = await supabase
+          .from('workout_logs')
+          .select('id');
+
+        if (!workoutError) {
+          setStats(prevStats => ({
+            ...prevStats,
+            totalWorkouts: workoutLogs.length
+          }));
         }
       } catch (error) {
         console.error('Errore nel caricamento dei dati:', error)
@@ -195,16 +207,6 @@ const Profile = () => {
           value={stats.totalExercises}
           Icon={FileText}
         />
-        <StatCard
-          title="Attrezzo Più Usato"
-          value={stats.mostUsedEquipment}
-          Icon={Tool}
-        />
-        <StatCard
-          title="Parte del Corpo Preferita"
-          value={stats.favoriteBodyPart}
-          Icon={Target}
-        />
       </div>
 
       {/* Azioni rapide */}
@@ -220,6 +222,12 @@ const Profile = () => {
           description="Personalizza il tuo programma di allenamento"
           Icon={Edit}
           link="/planner"
+        />
+        <QuickActionCard
+          title="Storico Allenamenti"
+          description="Visualizza i tuoi allenamenti completati"
+          Icon={BarChart2}
+          link="/history"
         />
       </div>
     </div>

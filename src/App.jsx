@@ -7,6 +7,7 @@ import Register from './components/Auth/Register'
 import WeeklyPlanner from './components/Planner/WeeklyPlanner'
 import WorkoutMode from './components/Workout/WorkoutMode'
 import Profile from './components/Profile/Profile'
+import WorkoutHistory from './components/History/WorkoutHistory'
 import PrivateRoute from './components/Auth/PrivateRoute'
 import AuthCallback from './components/Auth/AuthCallback'
 
@@ -32,6 +33,11 @@ function App() {
           <Route path="/profile" element={
             <PrivateRoute>
               <Profile />
+            </PrivateRoute>
+          } />
+          <Route path="/history" element={
+            <PrivateRoute>
+              <WorkoutHistory />
             </PrivateRoute>
           } />
         </Route>

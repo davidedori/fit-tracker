@@ -2,50 +2,35 @@ import React, { useState, useEffect } from 'react'
 import { supabase } from '../../services/supabase'
 import ExerciseGuide from './ExerciseGuide'
 import { dayNames } from '../../constants/days'
-import { Award, Calendar, ChevronRight, Clock, Activity, BarChart2, AlertCircle } from 'react-feather'
+import { Award, Calendar, ChevronRight, Clock, Activity, BarChart2, AlertCircle, Check } from 'react-feather'
 import Button from '../common/Button'
 import { Link } from 'react-router-dom'
-
-// Hook per gestire il blocco dello scroll del body
-const useBodyScrollLock = (isLocked) => {
-  useEffect(() => {
-    if (isLocked) {
-      // Salva la posizione di scorrimento corrente
-      const scrollY = window.scrollY
-      // Blocca lo scroll del body mantenendo la posizione
-      document.body.style.position = 'fixed'
-      document.body.style.top = `-${scrollY}px`
-      document.body.style.width = '100%'
-    } else {
-      // Ripristina lo scroll
-      const scrollY = document.body.style.top
-      document.body.style.position = ''
-      document.body.style.top = ''
-      document.body.style.width = ''
-      if (scrollY) {
-        window.scrollTo(0, parseInt(scrollY || '0', 10) * -1)
-      }
-    }
-    
-    return () => {
-      // Cleanup in caso di unmount
-      document.body.style.position = ''
-      document.body.style.top = ''
-      document.body.style.width = ''
-    }
-  }, [isLocked])
-}
+import { useAuth } from '../../contexts/AuthContext'
 
 const WorkoutMode = () => {
+  const { user } = useAuth()
   const [currentDay, setCurrentDay] = useState(new Date().getDay() || 7)
   const [exercises, setExercises] = useState([])
   const [currentExercise, setCurrentExercise] = useState(0)
   const [loading, setLoading] = useState(true)
   const [showCompletionModal, setShowCompletionModal] = useState(false)
   const [hasExercisesInOtherDays, setHasExercisesInOtherDays] = useState(false)
+  const [workoutNotes, setWorkoutNotes] = useState('')
+  const [workoutCompleted, setWorkoutCompleted] = useState(false)
   
-  // Utilizziamo il hook per bloccare lo scroll quando il modale è aperto
-  useBodyScrollLock(showCompletionModal)
+  // Blocca lo scroll del body quando il modale è aperto
+  useEffect(() => {
+    if (showCompletionModal) {
+      document.body.style.overflow = 'hidden'
+    } else {
+      document.body.style.overflow = 'auto'
+    }
+    
+    // Cleanup quando il componente viene smontato
+    return () => {
+      document.body.style.overflow = 'auto'
+    }
+  }, [showCompletionModal])
 
   useEffect(() => {
     fetchDayExercises()
@@ -87,17 +72,57 @@ const WorkoutMode = () => {
     }
   }
 
+  const handleWorkoutComplete = () => {
+    // Mostra il modale di completamento senza salvare subito
+    setWorkoutCompleted(true)
+    setShowCompletionModal(true)
+  }
+
+  const handleSaveWorkout = async () => {
+    try {
+      // Verifica che l'utente sia definito
+      if (!user) {
+        console.error('Utente non autenticato')
+        return
+      }
+
+      // Registra l'allenamento completato nel database
+      const { error } = await supabase
+        .from('workout_logs')
+        .insert({
+          user_id: user.id,
+          completed_at: new Date().toISOString(),
+          day_of_week: currentDay,
+          exercise_count: exercises.length,
+          duration_minutes: calculateEstimatedTime(),
+          notes: workoutNotes.trim()
+        })
+        
+      if (error) throw error
+      console.log('Allenamento registrato con successo')
+    } catch (error) {
+      console.error('Errore durante la registrazione dell\'allenamento:', error)
+    }
+  }
+
   const handleExerciseComplete = () => {
     if (currentExercise < exercises.length - 1) {
       setCurrentExercise(prev => prev + 1)
     } else {
-      setShowCompletionModal(true)
+      handleWorkoutComplete()
     }
   }
 
-  const handleCloseCompletionModal = () => {
+  const handleCloseCompletionModal = async () => {
+    // Se l'allenamento è stato completato ma non ancora salvato, salvalo
+    if (workoutCompleted) {
+      await handleSaveWorkout()
+      setWorkoutCompleted(false)
+    }
+    
     setShowCompletionModal(false)
     setCurrentExercise(0)
+    setWorkoutNotes('')
   }
 
   // Calcola il tempo totale stimato dell'allenamento
@@ -258,29 +283,45 @@ const WorkoutMode = () => {
       {/* Modale di completamento - migliorato per touch */}
       {showCompletionModal && (
         <div 
-          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50 touch-none"
-          onClick={handleCloseCompletionModal}
+          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-[300]"
+          onTouchMove={handleModalTouchMove}
         >
-          <div 
-            className="bg-white rounded-lg p-4 sm:p-6 max-w-md w-full text-center max-h-[90vh] overflow-y-auto overscroll-contain"
-            onClick={(e) => e.stopPropagation()}
-            onTouchMove={handleModalTouchMove}
-            style={{ WebkitOverflowScrolling: 'touch' }}
-          >
-            <div className="mb-3 sm:mb-4">
-              <Award size={50} className="mx-auto text-yellow-500" />
+          <div className="bg-white rounded-lg max-w-md w-full">
+            <div className="p-6">
+              <div className="flex items-center justify-center mb-4">
+                <div className="bg-green-100 rounded-full p-3">
+                  <Check className="h-8 w-8 text-green-500" />
+                </div>
+              </div>
+              <h2 className="text-xl font-bold text-center mb-2">Allenamento Completato!</h2>
+              <p className="text-center text-gray-600 mb-6">
+                Hai completato tutti gli esercizi programmati per oggi.
+              </p>
+              
+              {/* Campo note */}
+              <div className="mb-6">
+                <label htmlFor="workout-notes" className="block text-sm font-medium text-gray-700 mb-1">
+                  Note sull'allenamento (opzionale)
+                </label>
+                <textarea
+                  id="workout-notes"
+                  rows="3"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="Come ti sei sentito? Qualcosa da ricordare?"
+                  value={workoutNotes}
+                  onChange={(e) => setWorkoutNotes(e.target.value)}
+                ></textarea>
+              </div>
+              
+              <div className="flex flex-col sm:flex-row gap-3">
+                <button
+                  onClick={handleCloseCompletionModal}
+                  className="flex-1 bg-blue-500 text-white py-3 px-4 rounded-lg hover:bg-blue-600 transition-colors"
+                >
+                  Salva e torna alla Home
+                </button>
+              </div>
             </div>
-            <h3 className="text-lg sm:text-xl font-bold mb-2">Allenamento Completato!</h3>
-            <p className="text-sm sm:text-base text-gray-600 mb-4 sm:mb-6">Hai completato tutti gli esercizi di oggi.</p>
-            <Link to="/">
-              <Button 
-                onClick={handleCloseCompletionModal}
-                variant="primary" 
-                fullWidth
-              >
-                Torna alla Home
-              </Button>
-            </Link>
           </div>
         </div>
       )}

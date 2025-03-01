@@ -1,7 +1,7 @@
 import React from 'react'
 import { Outlet, Link, useLocation, Navigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
-import { User, Calendar, Activity } from 'react-feather'
+import { User, Calendar, Activity, BarChart2 } from 'react-feather'
 
 const Layout = () => {
   const { user } = useAuth()
@@ -10,7 +10,8 @@ const Layout = () => {
   const menuItems = [
     { path: '/profile', label: 'Profilo', icon: User },
     { path: '/planner', label: 'Planner', icon: Calendar },
-    { path: '/workout', label: 'Workout', icon: Activity }
+    { path: '/workout', label: 'Workout', icon: Activity },
+    { path: '/history', label: 'Storico', icon: BarChart2 }
   ]
 
   const isActive = (path) => location.pathname === path
@@ -22,7 +23,7 @@ const Layout = () => {
   return (
     <div className="min-h-screen bg-gray-100">
       {/* Top navigation - visible on all screens */}
-      <nav className="bg-white shadow-md">
+      <nav className="bg-white shadow-md relative z-[200]">
         <div className="max-w-7xl mx-auto px-4">
           <div className="flex justify-between h-16">
             <div className="flex items-center">
@@ -56,22 +57,22 @@ const Layout = () => {
       </nav>
 
       {/* Mobile bottom navigation */}
-      <div className="fixed bottom-0 left-0 right-0 bg-white border-t md:hidden">
-        <div className="grid grid-cols-3 h-16">
+      <div className="fixed bottom-0 left-0 right-0 bg-white border-t md:hidden z-[200]">
+        <div className="grid grid-cols-4 h-16">
           {menuItems.map(item => {
             const Icon = item.icon
             return (
               <Link
                 key={item.path}
                 to={item.path}
-                className={`flex flex-col items-center justify-center space-y-1
+                className={`flex flex-col items-center justify-center
                   ${isActive(item.path)
                     ? 'text-blue-500'
-                    : 'text-gray-600'
+                    : 'text-gray-500 hover:text-gray-900'
                   }`}
               >
                 <Icon size={20} />
-                <span className="text-xs">{item.label}</span>
+                <span className="text-xs mt-1">{item.label}</span>
               </Link>
             )
           })}
