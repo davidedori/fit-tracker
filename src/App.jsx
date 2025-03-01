@@ -13,6 +13,7 @@ import ClientPlanner from './components/Trainer/ClientPlanner'
 import PrivateRoute from './components/Auth/PrivateRoute'
 import TrainerRoute from './components/Auth/TrainerRoute'
 import AuthCallback from './components/Auth/AuthCallback'
+import ScrollToTop from './components/common/ScrollToTop'
 
 // Componente per gestire il reindirizzamento in base al ruolo
 const HomeRedirect = () => {
@@ -31,6 +32,7 @@ function App() {
   return (
     <AuthProvider>
       <div className="app-container">
+        <ScrollToTop />
         <Routes>
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />

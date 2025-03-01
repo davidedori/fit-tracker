@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react'
 import { supabase } from '../services/supabase'
+import { useNavigate } from 'react-router-dom'
 
 const AuthContext = createContext({
   user: null,
@@ -15,17 +16,65 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true)
   const [isTrainer, setIsTrainer] = useState(false)
   const [authError, setAuthError] = useState(null)
+  const navigate = useNavigate()
 
   console.log('AuthProvider inizializzato')
 
   const signOut = async () => {
     try {
-      console.log('Tentativo di logout...')
-      await supabase.auth.signOut()
-      console.log('Logout completato con successo')
+      console.log('Tentativo di logout completo...')
+      
+      // Resetta lo stato dell'applicazione
+      setUser(null)
+      setIsTrainer(false)
+      
+      // Rimuovi tutti i dati di Supabase dal localStorage
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i)
+        if (key && key.startsWith('sb-')) {
+          console.log(`Rimozione chiave localStorage: ${key}`)
+          localStorage.removeItem(key)
+          // Decrementa i perché abbiamo rimosso un elemento
+          i--
+        }
+      }
+      
+      // Tenta il logout standard da Supabase
+      try {
+        await supabase.auth.signOut()
+        console.log('Logout da Supabase completato')
+      } catch (error) {
+        console.error('Errore durante il logout da Supabase:', error)
+      }
+      
+      // Forza un reload della pagina per assicurarsi che tutto sia resettato
+      console.log('Reindirizzamento al login...')
+      navigate('/login', { replace: true })
+      
+      // Forza un reload completo dopo un breve ritardo
+      setTimeout(() => {
+        console.log('Ricaricamento completo della pagina')
+        window.location.reload()
+      }, 100)
+      
     } catch (error) {
-      console.error('Errore durante il logout:', error)
-      setAuthError(error.message)
+      console.error('Errore generale durante il logout:', error)
+      
+      // Anche in caso di errore, resettiamo tutto
+      setUser(null)
+      setIsTrainer(false)
+      
+      // Rimuovi tutti i dati di Supabase dal localStorage
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i)
+        if (key && key.startsWith('sb-')) {
+          localStorage.removeItem(key)
+          i--
+        }
+      }
+      
+      // Forza un reload della pagina
+      window.location.href = '/login'
     }
   }
 

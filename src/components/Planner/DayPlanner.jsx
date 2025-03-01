@@ -16,16 +16,18 @@ const DayPlanner = ({
   onEditExercise,
   onDuplicateExercise
 }) => {
-  const [showForm, setShowForm] = useState(false)
-  const [editingExercise, setEditingExercise] = useState(null)
   const [showDuplicateModal, setShowDuplicateModal] = useState(false)
+  const [editingExercise, setEditingExercise] = useState(null)
+  const [isAddingExercise, setIsAddingExercise] = useState(false)
 
-  const handleSave = (exercise) => {
-    onSave({
-      ...exercise,
-      day_of_week: day
-    })
-    setShowForm(false)
+  const handleSave = async (exerciseData) => {
+    if (isAddingExercise) {
+      await onSave(exerciseData)
+      setIsAddingExercise(false)
+    } else {
+      await onEditExercise(exerciseData)
+      setEditingExercise(null)
+    }
   }
 
   return (
@@ -34,7 +36,7 @@ const DayPlanner = ({
         <h2 className="text-lg font-semibold">{dayNames[day - 1]}</h2>
         <div className="flex space-x-2">
           <Button 
-            onClick={() => setShowForm(true)} 
+            onClick={() => setIsAddingExercise(true)} 
             variant="outline"
             className="p-2"
             title="Aggiungi esercizio"
@@ -145,21 +147,6 @@ const DayPlanner = ({
         )}
       </Droppable>
 
-      {showForm && (
-        <div className="mt-4">
-          <ExerciseForm 
-            day={day} 
-            onSave={handleSave} 
-          />
-          <button 
-            onClick={() => setShowForm(false)}
-            className="mt-2 w-full py-2 text-gray-600 hover:text-gray-800"
-          >
-            Annulla
-          </button>
-        </div>
-      )}
-
       <DuplicateModal 
         isOpen={showDuplicateModal}
         currentDay={day}
@@ -170,13 +157,18 @@ const DayPlanner = ({
         onClose={() => setShowDuplicateModal(false)}
       />
 
-      {editingExercise && (
+      {(editingExercise || isAddingExercise) && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-[300] overflow-y-auto">
           <div className="bg-white rounded-lg p-6 max-w-lg w-full max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-bold">Modifica esercizio</h3>
+              <h3 className="text-lg font-bold">
+                {isAddingExercise ? "Aggiungi esercizio" : "Modifica esercizio"}
+              </h3>
               <button 
-                onClick={() => setEditingExercise(null)}
+                onClick={() => {
+                  setEditingExercise(null)
+                  setIsAddingExercise(false)
+                }}
                 className="text-gray-500 hover:text-gray-700 focus:outline-none"
                 aria-label="Chiudi"
               >
@@ -187,20 +179,14 @@ const DayPlanner = ({
             </div>
             <ExerciseForm
               day={day}
-              initialData={{
-                ...editingExercise,
-                id: editingExercise.id,
-                user_id: editingExercise.user_id,
-                duration: editingExercise.mode === 'timer' ? 
-                  Math.max(0, parseInt(editingExercise.duration) || 0) : 0
-              }}
-              onSave={(updatedExercise) => {
-                onEditExercise(updatedExercise)
-                setEditingExercise(null)
-              }}
+              initialData={editingExercise}
+              onSave={handleSave}
             />
             <button 
-              onClick={() => setEditingExercise(null)}
+              onClick={() => {
+                setEditingExercise(null)
+                setIsAddingExercise(false)
+              }}
               className="mt-2 w-full py-2 text-gray-600 hover:text-gray-800"
             >
               Annulla

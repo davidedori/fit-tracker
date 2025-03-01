@@ -199,6 +199,17 @@ const Profile = () => {
     }
   }
 
+  // Funzione per gestire il logout
+  const handleLogout = async () => {
+    try {
+      console.log('Tentativo di logout dal profilo')
+      await signOut()
+      console.log('Logout completato, l\'utente dovrebbe essere reindirizzato')
+    } catch (error) {
+      console.error('Errore durante il logout dal profilo:', error)
+    }
+  }
+
   if (loading || loadingData) {
     return (
       <div className="flex justify-center items-center h-64">
@@ -217,7 +228,7 @@ const Profile = () => {
             {userProfile?.nome} {userProfile?.cognome}
           </h1>
           <button
-            onClick={signOut}
+            onClick={handleLogout}
             className="flex items-center gap-2 text-gray-500 hover:text-gray-900 transition-colors text-sm ml-2"
           >
             <LogOut size={16} />
