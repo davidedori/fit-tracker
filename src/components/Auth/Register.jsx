@@ -8,6 +8,8 @@ const Register = () => {
   const navigate = useNavigate()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [nome, setNome] = useState('')
+  const [cognome, setCognome] = useState('')
   const [error, setError] = useState(null)
 
   const handleRegister = async (e) => {
@@ -17,11 +19,28 @@ const Register = () => {
         email,
         password,
         options: {
-          emailRedirectTo: `${window.location.origin}/auth/callback`
+          emailRedirectTo: `${window.location.origin}/auth/callback`,
+          data: {
+            nome,
+            cognome
+          }
         }
       })
       
       if (error) throw error
+      
+      if (data.user) {
+        const { error: profileError } = await supabase
+          .from('user_profiles')
+          .upsert({
+            id: data.user.id,
+            role: 'user',
+            nome,
+            cognome
+          })
+          
+        if (profileError) throw profileError
+      }
       
       if (data.user && data.session) {
         navigate('/')
@@ -44,6 +63,20 @@ const Register = () => {
         {error && <div className="bg-red-50 p-4 rounded-md text-red-800 text-center">{error}</div>}
         <form onSubmit={handleRegister} className="mt-8 space-y-6">
           <div className="rounded-md shadow-sm space-y-4">
+            <Input
+              type="text"
+              value={nome}
+              onChange={(e) => setNome(e.target.value)}
+              placeholder="Nome"
+              required
+            />
+            <Input
+              type="text"
+              value={cognome}
+              onChange={(e) => setCognome(e.target.value)}
+              placeholder="Cognome"
+              required
+            />
             <Input
               type="email"
               value={email}

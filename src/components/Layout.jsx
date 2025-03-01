@@ -1,24 +1,50 @@
-import React from 'react'
+import React, { useEffect } from 'react'
 import { Outlet, Link, useLocation, Navigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
-import { User, Calendar, Activity, BarChart2 } from 'react-feather'
+import { User, Calendar, Activity, BarChart2, Users } from 'react-feather'
 
 const Layout = () => {
-  const { user } = useAuth()
+  const { user, isTrainer } = useAuth()
   const location = useLocation()
 
-  const menuItems = [
+  useEffect(() => {
+    console.log('Layout montato')
+    console.log('Stato utente in Layout:', user ? `ID: ${user.id}` : 'Nessuno')
+    console.log('Stato trainer in Layout:', isTrainer)
+    console.log('Percorso corrente:', location.pathname)
+    
+    return () => {
+      console.log('Layout smontato')
+    }
+  }, [user, isTrainer, location.pathname])
+
+  const userMenuItems = [
     { path: '/profile', label: 'Profilo', icon: User },
     { path: '/planner', label: 'Planner', icon: Calendar },
     { path: '/workout', label: 'Workout', icon: Activity },
     { path: '/history', label: 'Storico', icon: BarChart2 }
   ]
 
+  const trainerMenuItems = [
+    { path: '/trainer/dashboard', label: 'Dashboard', icon: Users },
+    { path: '/trainer/profile', label: 'Profilo', icon: User }
+  ]
+
+  const menuItems = isTrainer ? trainerMenuItems : userMenuItems
   const isActive = (path) => location.pathname === path
 
   if (!user) {
+    console.log('Nessun utente, reindirizzamento al login')
     return <Navigate to="/login" replace />
   }
+  
+  // Reindirizza i trainer alla dashboard se sono sulla pagina profilo
+  if (isTrainer && location.pathname === '/profile') {
+    console.log('Trainer reindirizzato alla dashboard')
+    return <Navigate to="/trainer/dashboard" replace />
+  }
+
+  console.log('Rendering Layout con menuItems:', menuItems)
 
   return (
     <div className="min-h-screen bg-gray-100">

@@ -5,27 +5,30 @@ import { supabase } from '../../services/supabase'
 import { useAuth } from '../../contexts/AuthContext'
 import { dayNames } from '../../constants/days'
 
-const WeeklyPlanner = () => {
+const WeeklyPlanner = ({ externalUserId = null }) => {
   const { user } = useAuth()
   const [weeklyRoutine, setWeeklyRoutine] = useState({})
   const [currentDay, setCurrentDay] = useState(1)
+  
+  // Determina quale ID utente utilizzare
+  const userId = externalUserId || user.id
 
   useEffect(() => {
     fetchRoutine()
-  }, [])
+  }, [userId])
 
   const fetchRoutine = async () => {
     const { data, error } = await supabase
       .from('exercises')
       .select('*')
-      .eq('user_id', user.id)
+      .eq('user_id', userId)
       .order('order_index')
     
     console.log('Data grezza dal DB:', JSON.stringify(data, null, 2))
     
     if (!error) {
       const routineByDay = data.reduce((acc, exercise) => {
-        if (!acc[exercise.day_of_week]) acc[exercise.day_of_week] = []
+        if (!acc[exercise.day_of_week + 1]) acc[exercise.day_of_week + 1] = []
         console.log('Esercizio prima del processing:', JSON.stringify(exercise, null, 2))
         
         // Assicuriamoci che la durata sia mantenuta solo per la modalità timer
@@ -38,7 +41,7 @@ const WeeklyPlanner = () => {
         }
         
         console.log('Esercizio dopo il processing:', JSON.stringify(processedExercise, null, 2))
-        acc[exercise.day_of_week].push(processedExercise)
+        acc[exercise.day_of_week + 1].push(processedExercise)
         return acc
       }, {})
       
@@ -57,8 +60,8 @@ const WeeklyPlanner = () => {
       
       const exerciseData = {
         ...exerciseWithoutId,
-        user_id: user.id,
-        day_of_week: exercise.day_of_week,
+        user_id: userId,
+        day_of_week: exercise.day_of_week - 1, // Adatta l'indice del giorno per il database (da 1-7 a 0-6)
         duration: exercise.mode === 'timer' ? Math.max(0, parseInt(exercise.duration) || 0) : 0,
         sets: exercise.mode === 'reps' ? (parseInt(exercise.sets) || 3) : 0,
         reps: exercise.mode === 'reps' ? (parseInt(exercise.reps) || 10) : 0,
@@ -103,8 +106,8 @@ const WeeklyPlanner = () => {
           .insert({
             ...exercise,
             id: undefined,
-            day_of_week: targetDayNum,
-            user_id: user.id,
+            day_of_week: targetDayNum - 1, // Adatta l'indice del giorno per il database (da 1-7 a 0-6)
+            user_id: userId,
             order_index: (weeklyRoutine[targetDayNum] || []).length
           })
         if (error) console.error('Errore durante la duplicazione:', error)
@@ -120,8 +123,8 @@ const WeeklyPlanner = () => {
     const { error } = await supabase
       .from('exercises')
       .delete()
-      .eq('day_of_week', day)
-      .eq('user_id', user.id)
+      .eq('day_of_week', day - 1) // Adatta l'indice del giorno per il database (da 1-7 a 0-6)
+      .eq('user_id', userId)
 
     if (!error) {
       const updatedRoutine = { ...weeklyRoutine }
@@ -139,13 +142,20 @@ const WeeklyPlanner = () => {
     const destDay = parseInt(destination.droppableId.split('-')[1])
     
     const sourceExercises = [...(weeklyRoutine[sourceDay] || [])]
-    const destExercises = sourceDay === destDay ? sourceExercises : [...(weeklyRoutine[destDay] || [])]
+    const destExercises = sourceDay === destDay 
+      ? sourceExercises 
+      : [...(weeklyRoutine[destDay] || [])]
     
+    // Rimuovi l'esercizio dalla posizione di origine
     const [movedExercise] = sourceExercises.splice(source.index, 1)
+    
+    // Aggiorna l'esercizio con il nuovo giorno
     const updatedExercise = {
       ...movedExercise,
-      day_of_week: destDay
+      day_of_week: destDay - 1 // Adatta l'indice del giorno per il database (da 1-7 a 0-6)
     }
+    
+    // Inserisci l'esercizio nella posizione di destinazione
     destExercises.splice(destination.index, 0, updatedExercise)
 
     // Aggiorna lo stato locale
@@ -160,7 +170,7 @@ const WeeklyPlanner = () => {
       await supabase
         .from('exercises')
         .update({ 
-          day_of_week: destDay,
+          day_of_week: destDay - 1, // Adatta l'indice del giorno per il database (da 1-7 a 0-6)
           order_index: destination.index 
         })
         .eq('id', movedExercise.id)
@@ -168,25 +178,19 @@ const WeeklyPlanner = () => {
       // Poi aggiorna gli indici di tutti gli esercizi nel giorno di destinazione
       const updates = destExercises.map((ex, index) => ({
         id: ex.id,
-        user_id: ex.user_id,
-        day_of_week: destDay,
-        order_index: index,
-        name: ex.name,
-        equipment: ex.equipment || '',
-        body_part: ex.body_part || '',
-        type: ex.type || 'strength',
-        description: ex.description || '',
-        mode: ex.mode,
-        duration: ex.mode === 'timer' ? parseInt(ex.duration) || 0 : 0,
-        sets: ex.mode === 'reps' ? parseInt(ex.sets) || 3 : 0,
-        reps: ex.mode === 'reps' ? parseInt(ex.reps) || 10 : 0,
-        rest: parseInt(ex.rest) || 0
+        order_index: index
       }))
 
-      await supabase.from('exercises').upsert(updates)
+      for (const update of updates) {
+        await supabase
+          .from('exercises')
+          .update({ order_index: update.order_index })
+          .eq('id', update.id)
+      }
+      
+      await fetchRoutine()
     } catch (error) {
       console.error('Errore durante il riordinamento:', error)
-      await fetchRoutine()
     }
   }
 
@@ -196,16 +200,12 @@ const WeeklyPlanner = () => {
         .from('exercises')
         .delete()
         .eq('id', exerciseId)
-        .eq('user_id', user.id)
+        .eq('user_id', userId)
 
       if (error) throw error
 
       // Aggiorna lo stato locale dopo l'eliminazione
-      const updatedRoutine = { ...weeklyRoutine }
-      Object.keys(updatedRoutine).forEach(day => {
-        updatedRoutine[day] = updatedRoutine[day].filter(ex => ex.id !== exerciseId)
-      })
-      setWeeklyRoutine(updatedRoutine)
+      await fetchRoutine()
     } catch (error) {
       console.error('Errore durante l\'eliminazione:', error)
     }
@@ -222,6 +222,7 @@ const WeeklyPlanner = () => {
     try {
       const exerciseData = {
         ...updatedExercise,
+        day_of_week: updatedExercise.day_of_week - 1, // Adatta l'indice del giorno per il database (da 1-7 a 0-6)
         duration: updatedExercise.mode === 'timer' 
           ? Math.max(0, parseInt(updatedExercise.duration) || 0)
           : 0,
@@ -234,7 +235,7 @@ const WeeklyPlanner = () => {
         .from('exercises')
         .update(exerciseData)
         .eq('id', updatedExercise.id)
-        .eq('user_id', user.id)
+        .eq('user_id', userId)
 
       if (error) throw error
       await fetchRoutine()
@@ -262,8 +263,8 @@ const WeeklyPlanner = () => {
         sets: exercise.mode === 'reps' ? parseInt(exercise.sets) || 3 : 0,
         reps: exercise.mode === 'reps' ? parseInt(exercise.reps) || 10 : 0,
         rest: parseInt(exercise.rest) || 0,
-        day_of_week: exercise.day_of_week,
-        user_id: user.id,
+        day_of_week: exercise.day_of_week - 1, // Adatta l'indice del giorno per il database (da 1-7 a 0-6)
+        user_id: userId,
         order_index: (weeklyRoutine[exercise.day_of_week] || []).length
       }
 
