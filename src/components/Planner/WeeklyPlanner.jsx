@@ -28,8 +28,7 @@ const WeeklyPlanner = ({ externalUserId = null }) => {
     
     if (!error) {
       const routineByDay = data.reduce((acc, exercise) => {
-        if (!acc[exercise.day_of_week + 1]) acc[exercise.day_of_week + 1] = []
-        console.log('Esercizio prima del processing:', JSON.stringify(exercise, null, 2))
+        if (!acc[exercise.day_of_week]) acc[exercise.day_of_week] = []
         
         // Assicuriamoci che la durata sia mantenuta solo per la modalità timer
         const processedExercise = {
@@ -40,8 +39,7 @@ const WeeklyPlanner = ({ externalUserId = null }) => {
           rest: parseInt(exercise.rest) || 0
         }
         
-        console.log('Esercizio dopo il processing:', JSON.stringify(processedExercise, null, 2))
-        acc[exercise.day_of_week + 1].push(processedExercise)
+        acc[exercise.day_of_week].push(processedExercise)
         return acc
       }, {})
       
@@ -61,7 +59,7 @@ const WeeklyPlanner = ({ externalUserId = null }) => {
       const exerciseData = {
         ...exerciseWithoutId,
         user_id: userId,
-        day_of_week: exercise.day_of_week - 1, // Adatta l'indice del giorno per il database (da 1-7 a 0-6)
+        day_of_week: exercise.day_of_week, // Non sottrarre 1, salva direttamente 1-7
         duration: exercise.mode === 'timer' ? Math.max(0, parseInt(exercise.duration) || 0) : 0,
         sets: exercise.mode === 'reps' ? (parseInt(exercise.sets) || 3) : 0,
         reps: exercise.mode === 'reps' ? (parseInt(exercise.reps) || 10) : 0,
@@ -106,7 +104,7 @@ const WeeklyPlanner = ({ externalUserId = null }) => {
           .insert({
             ...exercise,
             id: undefined,
-            day_of_week: targetDayNum - 1, // Adatta l'indice del giorno per il database (da 1-7 a 0-6)
+            day_of_week: targetDayNum, // Non sottrarre 1
             user_id: userId,
             order_index: (weeklyRoutine[targetDayNum] || []).length
           })
@@ -123,7 +121,7 @@ const WeeklyPlanner = ({ externalUserId = null }) => {
     const { error } = await supabase
       .from('exercises')
       .delete()
-      .eq('day_of_week', day - 1) // Adatta l'indice del giorno per il database (da 1-7 a 0-6)
+      .eq('day_of_week', day) // Non sottrarre 1
       .eq('user_id', userId)
 
     if (!error) {
@@ -152,7 +150,7 @@ const WeeklyPlanner = ({ externalUserId = null }) => {
     // Aggiorna l'esercizio con il nuovo giorno
     const updatedExercise = {
       ...movedExercise,
-      day_of_week: destDay - 1 // Adatta l'indice del giorno per il database (da 1-7 a 0-6)
+      day_of_week: destDay // Non sottrarre 1
     }
     
     // Inserisci l'esercizio nella posizione di destinazione
@@ -170,7 +168,7 @@ const WeeklyPlanner = ({ externalUserId = null }) => {
       await supabase
         .from('exercises')
         .update({ 
-          day_of_week: destDay - 1, // Adatta l'indice del giorno per il database (da 1-7 a 0-6)
+          day_of_week: destDay, // Non sottrarre 1
           order_index: destination.index 
         })
         .eq('id', movedExercise.id)
@@ -222,7 +220,7 @@ const WeeklyPlanner = ({ externalUserId = null }) => {
     try {
       const exerciseData = {
         ...updatedExercise,
-        day_of_week: updatedExercise.day_of_week - 1, // Adatta l'indice del giorno per il database (da 1-7 a 0-6)
+        day_of_week: updatedExercise.day_of_week, // Non sottrarre 1
         duration: updatedExercise.mode === 'timer' 
           ? Math.max(0, parseInt(updatedExercise.duration) || 0)
           : 0,
@@ -263,7 +261,7 @@ const WeeklyPlanner = ({ externalUserId = null }) => {
         sets: exercise.mode === 'reps' ? parseInt(exercise.sets) || 3 : 0,
         reps: exercise.mode === 'reps' ? parseInt(exercise.reps) || 10 : 0,
         rest: parseInt(exercise.rest) || 0,
-        day_of_week: exercise.day_of_week - 1, // Adatta l'indice del giorno per il database (da 1-7 a 0-6)
+        day_of_week: exercise.day_of_week, // Non sottrarre 1
         user_id: userId,
         order_index: (weeklyRoutine[exercise.day_of_week] || []).length
       }

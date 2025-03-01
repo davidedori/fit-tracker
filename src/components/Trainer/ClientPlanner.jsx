@@ -329,7 +329,7 @@ const ClientPlanner = () => {
                             {clientData.exercises.map((exercise) => (
                               <tr key={exercise.id} className="hover:bg-gray-50">
                                 <td className="px-6 py-4 whitespace-nowrap">
-                                  <span className="font-medium">{getDayName(exercise.day_of_week)}</span>
+                                  {dayNames[exercise.day_of_week - 1]}
                                 </td>
                                 <td className="px-6 py-4">
                                   <div className="font-medium text-gray-900">{exercise.name}</div>
