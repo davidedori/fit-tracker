@@ -1,25 +1,103 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { supabase } from '../../services/supabase'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useLocation } from 'react-router-dom'
 import Input from '../common/Input'
 import { Activity } from 'react-feather'
 
+const getBaseUrl = () => {
+  return window.getBaseUrl();
+};
+
 const Register = () => {
   const navigate = useNavigate()
+  const location = useLocation()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [nome, setNome] = useState('')
   const [cognome, setCognome] = useState('')
   const [error, setError] = useState(null)
+  const [loading, setLoading] = useState(false)
+  const [isInvited, setIsInvited] = useState(false)
+  const [invitedEmail, setInvitedEmail] = useState('')
+  const [token, setToken] = useState('')
+  const [checkingInvitation, setCheckingInvitation] = useState(true)
+
+  // Controlla se l'utente arriva da un link di invito
+  useEffect(() => {
+    const checkInvitation = async () => {
+      setCheckingInvitation(true)
+      setError(null)
+      
+      // Estrai il token dall'URL
+      const params = new URLSearchParams(location.search)
+      const inviteToken = params.get('token')
+      
+      if (inviteToken) {
+        setToken(inviteToken)
+        try {
+          console.log('Verifica token:', inviteToken)
+          
+          // Verifica il token di invito
+          const { data, error } = await supabase
+            .from('user_invitations')
+            .select('*')
+            .eq('token', inviteToken)
+            .eq('is_accepted', false)
+          
+          if (error) {
+            console.error('Errore nella query dell\'invito:', error)
+            setError('Errore nella verifica dell\'invito: ' + error.message)
+            setCheckingInvitation(false)
+            return
+          }
+          
+          console.log('Risultato query invito:', data)
+          
+          if (data && data.length > 0) {
+            setIsInvited(true)
+            setInvitedEmail(data[0].email)
+            setEmail(data[0].email)
+          } else {
+            console.log('Nessun invito trovato per il token:', inviteToken)
+            setError('Invito non valido o già utilizzato')
+          }
+        } catch (error) {
+          console.error('Errore nella verifica dell\'invito:', error)
+          setError('Si è verificato un errore durante la verifica dell\'invito')
+        }
+      } else {
+        // Se non c'è un token, verifica se la registrazione è aperta
+        setError('La registrazione è disponibile solo tramite invito')
+      }
+      
+      setCheckingInvitation(false)
+    }
+    
+    checkInvitation()
+  }, [location])
 
   const handleRegister = async (e) => {
     e.preventDefault()
+    setLoading(true)
+    setError(null)
+    
     try {
+      // Verifica che l'utente sia stato invitato
+      if (!isInvited) {
+        throw new Error('La registrazione è disponibile solo tramite invito')
+      }
+      
+      // Verifica che l'email corrisponda a quella dell'invito
+      if (email !== invitedEmail) {
+        throw new Error('L\'email deve corrispondere a quella dell\'invito')
+      }
+      
+      // Registra l'utente
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
         options: {
-          emailRedirectTo: `${window.location.origin}/auth/callback`,
+          emailRedirectTo: `${getBaseUrl()}/auth/callback`,
           data: {
             nome,
             cognome
@@ -30,16 +108,50 @@ const Register = () => {
       if (error) throw error
       
       if (data.user) {
-        const { error: profileError } = await supabase
-          .from('user_profiles')
-          .upsert({
-            id: data.user.id,
-            role: 'user',
-            nome,
-            cognome
-          })
+        console.log('Utente registrato con successo:', data.user.id)
+        
+        try {
+          // Crea il profilo utente
+          const { error: profileError } = await supabase
+            .from('user_profiles')
+            .upsert({
+              id: data.user.id,
+              role: 'user',
+              nome,
+              cognome
+            })
+            
+          if (profileError) {
+            console.error('Errore nella creazione del profilo:', profileError)
+            // Non blocchiamo la registrazione se questo fallisce
+          } else {
+            console.log('Profilo utente creato con successo')
+          }
+        } catch (profileError) {
+          console.error('Eccezione nella creazione del profilo:', profileError)
+          // Non blocchiamo la registrazione se questo fallisce
+        }
+        
+        try {
+          // Aggiorna lo stato dell'invito
+          const { error: inviteError } = await supabase
+            .from('user_invitations')
+            .update({
+              is_accepted: true,
+              accepted_at: new Date().toISOString()
+            })
+            .eq('token', token)
           
-        if (profileError) throw profileError
+          if (inviteError) {
+            console.error('Errore nell\'aggiornamento dell\'invito:', inviteError)
+            // Non blocchiamo la registrazione se questo fallisce
+          } else {
+            console.log('Invito aggiornato con successo')
+          }
+        } catch (inviteError) {
+          console.error('Eccezione nell\'aggiornamento dell\'invito:', inviteError)
+          // Non blocchiamo la registrazione se questo fallisce
+        }
       }
       
       if (data.user && data.session) {
@@ -48,7 +160,10 @@ const Register = () => {
         navigate('/login?message=check-email')
       }
     } catch (error) {
+      console.error('Errore durante la registrazione:', error)
       setError(error.message)
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -60,53 +175,78 @@ const Register = () => {
           <span className="text-2xl font-bold text-gray-900">FitTracker</span>
         </div>
         <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">Registrati</h2>
-        {error && <div className="bg-red-50 p-4 rounded-md text-red-800 text-center">{error}</div>}
-        <form onSubmit={handleRegister} className="mt-8 space-y-6">
-          <div className="rounded-md shadow-sm space-y-4">
-            <Input
-              type="text"
-              value={nome}
-              onChange={(e) => setNome(e.target.value)}
-              placeholder="Nome"
-              required
-            />
-            <Input
-              type="text"
-              value={cognome}
-              onChange={(e) => setCognome(e.target.value)}
-              placeholder="Cognome"
-              required
-            />
-            <Input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="Email"
-              required
-            />
-            <Input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="Password"
-              required
-            />
+        
+        {checkingInvitation ? (
+          <div className="flex justify-center items-center py-8">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
           </div>
-          <button
-            type="submit"
-            className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors duration-200"
-          >
-            Registrati
-          </button>
-        </form>
-        <div className="text-center mt-4">
-          <Link 
-            to="/login" 
-            className="text-sm text-blue-600 hover:text-blue-500"
-          >
-            Hai già un account? Accedi
-          </Link>
-        </div>
+        ) : (
+          <>
+            {error && <div className="bg-red-50 p-4 rounded-md text-red-800 text-center">{error}</div>}
+            
+            {isInvited ? (
+              <form onSubmit={handleRegister} className="mt-8 space-y-6">
+                <div className="rounded-md shadow-sm space-y-4">
+                  <Input
+                    type="text"
+                    value={nome}
+                    onChange={(e) => setNome(e.target.value)}
+                    placeholder="Nome"
+                    required
+                  />
+                  <Input
+                    type="text"
+                    value={cognome}
+                    onChange={(e) => setCognome(e.target.value)}
+                    placeholder="Cognome"
+                    required
+                  />
+                  <Input
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="Email"
+                    required
+                    disabled={true} // L'email è fissata a quella dell'invito
+                  />
+                  <Input
+                    type="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="Password"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                  >
+                    {loading ? (
+                      <span className="flex items-center">
+                        <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        Registrazione in corso...
+                      </span>
+                    ) : (
+                      'Registrati'
+                    )}
+                  </button>
+                </div>
+              </form>
+            ) : (
+              <div className="mt-4 text-center">
+                <p className="text-gray-600">
+                  Hai già un account? <Link to="/login" className="font-medium text-blue-600 hover:text-blue-500">Accedi</Link>
+                </p>
+              </div>
+            )}
+          </>
+        )}
       </div>
     </div>
   )

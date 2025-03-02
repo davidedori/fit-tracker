@@ -14,6 +14,7 @@ import PrivateRoute from './components/Auth/PrivateRoute'
 import TrainerRoute from './components/Auth/TrainerRoute'
 import AuthCallback from './components/Auth/AuthCallback'
 import ScrollToTop from './components/common/ScrollToTop'
+import InviteUsers from './components/Trainer/InviteUsers'
 
 // Componente per gestire il reindirizzamento in base al ruolo
 const HomeRedirect = () => {
@@ -50,6 +51,7 @@ function App() {
             <Route path="/trainer/dashboard" element={<TrainerRoute><TrainerDashboard /></TrainerRoute>} />
             <Route path="/trainer/client/:clientId" element={<TrainerRoute><ClientPlanner /></TrainerRoute>} />
             <Route path="/trainer/profile" element={<TrainerRoute><Profile /></TrainerRoute>} />
+            <Route path="/trainer/invites" element={<TrainerRoute><InviteUsers /></TrainerRoute>} />
           </Route>
           <Route path="*" element={
             <div className="flex justify-center items-center h-screen">

@@ -74,7 +74,7 @@ export const AuthProvider = ({ children }) => {
       }
       
       // Forza un reload della pagina
-      window.location.href = '/login'
+      window.location.href = window.getBaseUrl() + '/login'
     }
   }
 
