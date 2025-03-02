@@ -1,6 +1,6 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
-import { BrowserRouter as Router } from 'react-router-dom'
+import { HashRouter as Router } from 'react-router-dom'
 import App from './App'
 import './index.css'
 
@@ -14,7 +14,7 @@ window.getBaseUrl = () => {
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
-    <Router basename={BASE_PATH}>
+    <Router>
       <App />
     </Router>
   </React.StrictMode>
