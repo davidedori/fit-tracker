@@ -97,7 +97,7 @@ const Register = () => {
         email,
         password,
         options: {
-          emailRedirectTo: `${getBaseUrl()}/auth/callback`,
+          emailRedirectTo: `${getBaseUrl()}/#/auth/callback`,
           data: {
             nome,
             cognome

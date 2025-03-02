@@ -73,7 +73,7 @@ const InviteUsers = () => {
       // Se esiste già un invito attivo, usa quello
       if (existingInvites && existingInvites.length > 0) {
         const existingInvite = existingInvites[0]
-        const inviteUrl = `${getBaseUrl()}/register?token=${existingInvite.token}`
+        const inviteUrl = `${getBaseUrl()}/#/register?token=${existingInvite.token}`
         setInviteLink(inviteUrl)
         setSuccess(`Invito esistente recuperato per ${email}. Copia il link per inviarlo.`)
         setEmail('')
@@ -99,7 +99,7 @@ const InviteUsers = () => {
       if (error) throw error
       
       // Crea il link di invito
-      const inviteUrl = `${getBaseUrl()}/register?token=${token}`
+      const inviteUrl = `${getBaseUrl()}/#/register?token=${token}`
       setInviteLink(inviteUrl)
       
       setSuccess(`Invito registrato per ${email}. Copia il link per inviarlo manualmente.`)

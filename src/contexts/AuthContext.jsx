@@ -49,7 +49,7 @@ export const AuthProvider = ({ children }) => {
       
       // Forza un reload della pagina per assicurarsi che tutto sia resettato
       console.log('Reindirizzamento al login...')
-      navigate('/login', { replace: true })
+      navigate('/#/login', { replace: true })
       
       // Forza un reload completo dopo un breve ritardo
       setTimeout(() => {
@@ -74,7 +74,7 @@ export const AuthProvider = ({ children }) => {
       }
       
       // Forza un reload della pagina
-      window.location.href = window.getBaseUrl() + '/login'
+      window.location.href = window.getBaseUrl() + '/#/login'
     }
   }
 
