@@ -13,6 +13,7 @@ const Register = () => {
   const location = useLocation()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
   const [nome, setNome] = useState('')
   const [cognome, setCognome] = useState('')
   const [error, setError] = useState(null)
@@ -90,6 +91,11 @@ const Register = () => {
       // Verifica che l'email corrisponda a quella dell'invito
       if (email !== invitedEmail) {
         throw new Error('L\'email deve corrispondere a quella dell\'invito')
+      }
+      
+      // Verifica che le password corrispondano
+      if (password !== confirmPassword) {
+        throw new Error('Le password non corrispondono')
       }
       
       // Registra l'utente
@@ -214,6 +220,13 @@ const Register = () => {
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="Password"
+                    required
+                  />
+                  <Input
+                    type="password"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    placeholder="Conferma Password"
                     required
                   />
                 </div>
