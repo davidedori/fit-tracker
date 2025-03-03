@@ -5,7 +5,7 @@ import Input from '../common/Input'
 import { Activity } from 'react-feather'
 
 const getBaseUrl = () => {
-  return window.getBaseUrl();
+  return window.location.origin;
 };
 
 const ResetPassword = () => {
@@ -21,7 +21,7 @@ const ResetPassword = () => {
     
     try {
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${getBaseUrl()}/#/update-password`,
+        redirectTo: `${getBaseUrl()}/update-password`,
       })
       
       if (error) throw error
