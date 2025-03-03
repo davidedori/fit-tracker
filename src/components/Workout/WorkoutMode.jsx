@@ -4,11 +4,12 @@ import ExerciseGuide from './ExerciseGuide'
 import { dayNames } from '../../constants/days'
 import { Award, Calendar, ChevronRight, Clock, Activity, BarChart2, AlertCircle, Check } from 'react-feather'
 import Button from '../common/Button'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
 
 const WorkoutMode = () => {
   const { user } = useAuth()
+  const navigate = useNavigate()
   const [currentDay, setCurrentDay] = useState(new Date().getDay() || 7)
   const [exercises, setExercises] = useState([])
   const [currentExercise, setCurrentExercise] = useState(0)
@@ -17,6 +18,7 @@ const WorkoutMode = () => {
   const [hasExercisesInOtherDays, setHasExercisesInOtherDays] = useState(false)
   const [workoutNotes, setWorkoutNotes] = useState('')
   const [workoutCompleted, setWorkoutCompleted] = useState(false)
+  const [workoutSaved, setWorkoutSaved] = useState(false)
   
   // Blocca lo scroll del body quando il modale è aperto
   useEffect(() => {
@@ -80,9 +82,9 @@ const WorkoutMode = () => {
 
   const handleSaveWorkout = async () => {
     try {
-      // Verifica che l'utente sia definito
-      if (!user) {
-        console.error('Utente non autenticato')
+      // Verifica che l'utente sia definito e che l'allenamento non sia già stato salvato
+      if (!user || workoutSaved) {
+        console.log('Utente non autenticato o allenamento già salvato')
         return
       }
 
@@ -99,6 +101,9 @@ const WorkoutMode = () => {
         })
         
       if (error) throw error
+      
+      // Segna l'allenamento come salvato
+      setWorkoutSaved(true)
       console.log('Allenamento registrato con successo')
     } catch (error) {
       console.error('Errore durante la registrazione dell\'allenamento:', error)
@@ -115,7 +120,7 @@ const WorkoutMode = () => {
 
   const handleCloseCompletionModal = async () => {
     // Se l'allenamento è stato completato ma non ancora salvato, salvalo
-    if (workoutCompleted) {
+    if (workoutCompleted && !workoutSaved) {
       await handleSaveWorkout()
       setWorkoutCompleted(false)
     }
@@ -123,6 +128,8 @@ const WorkoutMode = () => {
     setShowCompletionModal(false)
     setCurrentExercise(0)
     setWorkoutNotes('')
+    
+    navigate('/profile')
   }
 
   // Calcola il tempo totale stimato dell'allenamento
