@@ -129,7 +129,8 @@ const WorkoutMode = () => {
     setCurrentExercise(0)
     setWorkoutNotes('')
     
-    navigate('/profile')
+    // Reindirizza alla pagina dello storico invece che al profilo
+    navigate('/history')
   }
 
   // Calcola il tempo totale stimato dell'allenamento
@@ -325,7 +326,7 @@ const WorkoutMode = () => {
                   onClick={handleCloseCompletionModal}
                   className="flex-1 bg-blue-500 text-white py-3 px-4 rounded-lg hover:bg-blue-600 transition-colors"
                 >
-                  Salva e torna alla Home
+                  Salva allenamento
                 </button>
               </div>
             </div>
