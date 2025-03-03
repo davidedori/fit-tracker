@@ -290,9 +290,6 @@ const TrainerDashboard = () => {
                   <thead className="bg-gray-50">
                     <tr>
                       <th scope="col" className="w-16"></th>
-                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Nome
-                      </th>
                       <th 
                         scope="col" 
                         className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
@@ -302,6 +299,9 @@ const TrainerDashboard = () => {
                           Cognome
                           <span className="ml-1">{getSortIcon('cognome')}</span>
                         </div>
+                      </th>
+                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Nome
                       </th>
                       <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Email
@@ -333,10 +333,10 @@ const TrainerDashboard = () => {
                           </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                          {client.nome || 'N/D'}
+                          {client.cognome || 'N/D'}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                          {client.cognome || 'N/D'}
+                          {client.nome || 'N/D'}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                           {client.email}
