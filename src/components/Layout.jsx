@@ -1,7 +1,7 @@
 import React, { useEffect } from 'react'
 import { Outlet, Link, useLocation, Navigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
-import { User, Calendar, Activity, BarChart2, Users, Mail } from 'react-feather'
+import { User, Calendar, Activity, BarChart2, Users, Share2, Link as LinkIcon } from 'react-feather'
 
 const Layout = () => {
   const { user, isTrainer } = useAuth()
@@ -27,7 +27,7 @@ const Layout = () => {
 
   const trainerMenuItems = [
     { path: '/trainer/dashboard', label: 'Dashboard', icon: Users },
-    { path: '/trainer/invites', label: 'Inviti', icon: Mail },
+    { path: '/trainer/invites', label: 'Inviti', icon: Share2 },
     { path: '/trainer/profile', label: 'Profilo', icon: User }
   ]
 
