@@ -222,13 +222,15 @@ const Register = () => {
                     placeholder="Password"
                     required
                   />
-                  <Input
-                    type="password"
-                    value={confirmPassword}
-                    onChange={(e) => setConfirmPassword(e.target.value)}
-                    placeholder="Conferma Password"
-                    required
-                  />
+                  <div className="mt-4">
+                    <Input
+                      type="password"
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      placeholder="Conferma Password"
+                      required
+                    />
+                  </div>
                 </div>
 
                 <div>
