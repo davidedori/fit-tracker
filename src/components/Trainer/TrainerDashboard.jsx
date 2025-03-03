@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react'
 import { supabase } from '../../services/supabase'
 import { useAuth } from '../../contexts/AuthContext'
-import { User, Calendar, Search, RefreshCw, UserPlus } from 'react-feather'
-import { Link } from 'react-router-dom'
+import { User, Calendar, Search, RefreshCw, UserPlus, Clipboard, Settings, ChevronUp, ChevronDown } from 'react-feather'
+import { Link, useNavigate } from 'react-router-dom'
 
 const TrainerDashboard = () => {
   const { user, isTrainer } = useAuth()
@@ -10,11 +10,13 @@ const TrainerDashboard = () => {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [searchTerm, setSearchTerm] = useState('')
+  const [sortConfig, setSortConfig] = useState({ key: 'cognome', direction: 'asc' })
   const [stats, setStats] = useState({
     totalClients: 0,
     activeClients: 0,
     newClientsThisMonth: 0
   })
+  const navigate = useNavigate()
 
   useEffect(() => {
     console.log('TrainerDashboard montato')
@@ -121,16 +123,69 @@ const TrainerDashboard = () => {
     setLoading(false)
   }
 
-  const filteredClients = clients.filter(client => {
-    const query = searchTerm.toLowerCase().trim();
+  // Funzione per gestire l'ordinamento
+  const requestSort = (key) => {
+    let direction = 'asc';
+    if (sortConfig.key === key && sortConfig.direction === 'asc') {
+      direction = 'desc';
+    }
+    setSortConfig({ key, direction });
+  };
+
+  // Funzione per ottenere l'icona di ordinamento
+  const getSortIcon = (columnName) => {
+    if (sortConfig.key === columnName) {
+      return sortConfig.direction === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />;
+    }
+    // Mostra sempre un'icona di default (freccia giù più chiara)
+    return <ChevronDown size={14} className="text-gray-300" />;
+  };
+
+  // Filtra e ordina i clienti
+  const sortedAndFilteredClients = React.useMemo(() => {
+    // Prima filtra i clienti
+    let filteredResults = clients.filter(client => {
+      const query = searchTerm.toLowerCase().trim();
+      return (
+        client.email?.toLowerCase().includes(query) ||
+        client.nome?.toLowerCase().includes(query) ||
+        client.cognome?.toLowerCase().includes(query)
+      );
+    });
+
+    // Poi ordina i risultati filtrati
+    if (sortConfig.key) {
+      filteredResults.sort((a, b) => {
+        // Gestione valori null o undefined
+        if (!a[sortConfig.key] && !b[sortConfig.key]) return 0;
+        if (!a[sortConfig.key]) return 1;
+        if (!b[sortConfig.key]) return -1;
+
+        // Ordinamento per data se la colonna è 'created_at'
+        if (sortConfig.key === 'created_at') {
+          const dateA = new Date(a[sortConfig.key]);
+          const dateB = new Date(b[sortConfig.key]);
+          return sortConfig.direction === 'asc' 
+            ? dateA - dateB 
+            : dateB - dateA;
+        }
+
+        // Ordinamento alfabetico per le altre colonne
+        const valueA = a[sortConfig.key].toString().toLowerCase();
+        const valueB = b[sortConfig.key].toString().toLowerCase();
+        
+        if (valueA < valueB) {
+          return sortConfig.direction === 'asc' ? -1 : 1;
+        }
+        if (valueA > valueB) {
+          return sortConfig.direction === 'asc' ? 1 : -1;
+        }
+        return 0;
+      });
+    }
     
-    // Cerca in email, nome e cognome
-    return (
-      client.email?.toLowerCase().includes(query) ||
-      client.nome?.toLowerCase().includes(query) ||
-      client.cognome?.toLowerCase().includes(query)
-    );
-  })
+    return filteredResults;
+  }, [clients, searchTerm, sortConfig]);
 
   if (!isTrainer) {
     console.log('Utente non è trainer, reindirizzamento')
@@ -146,13 +201,13 @@ const TrainerDashboard = () => {
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold">Dashboard Trainer</h1>
+        <h1 className="text-2xl font-bold">Dashboard</h1>
         <button 
           onClick={fetchClients} 
-          className="flex items-center gap-2 bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded"
+          className="p-2 text-gray-500 hover:text-blue-600 transition-colors rounded-full hover:bg-gray-100"
+          title="Aggiorna"
         >
-          <RefreshCw size={16} />
-          Aggiorna
+          <RefreshCw size={18} />
         </button>
       </div>
       
@@ -225,7 +280,7 @@ const TrainerDashboard = () => {
               </div>
             </div>
             
-            {filteredClients.length === 0 ? (
+            {sortedAndFilteredClients.length === 0 ? (
               <div className="p-6 text-center text-gray-500">
                 {searchTerm ? 'Nessun cliente trovato con questi criteri di ricerca.' : 'Nessun cliente disponibile.'}
               </div>
@@ -234,26 +289,49 @@ const TrainerDashboard = () => {
                 <table className="min-w-full divide-y divide-gray-200">
                   <thead className="bg-gray-50">
                     <tr>
+                      <th scope="col" className="w-16"></th>
                       <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Nome
                       </th>
-                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Cognome
+                      <th 
+                        scope="col" 
+                        className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
+                        onClick={() => requestSort('cognome')}
+                      >
+                        <div className="flex items-center">
+                          Cognome
+                          <span className="ml-1">{getSortIcon('cognome')}</span>
+                        </div>
                       </th>
                       <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Email
                       </th>
-                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Data Registrazione
-                      </th>
-                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Azioni
+                      <th 
+                        scope="col" 
+                        className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
+                        onClick={() => requestSort('created_at')}
+                      >
+                        <div className="flex items-center">
+                          Data reg.
+                          <span className="ml-1">{getSortIcon('created_at')}</span>
+                        </div>
                       </th>
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
-                    {filteredClients.map((client) => (
+                    {sortedAndFilteredClients.map((client) => (
                       <tr key={client.id} className="hover:bg-gray-50">
+                        <td className="px-3 py-4 whitespace-nowrap text-sm">
+                          <div className="flex justify-center">
+                            <button
+                              onClick={() => navigate(`/trainer/client/${client.id}`)}
+                              className="p-1 text-blue-600 hover:text-blue-800"
+                              title="Gestisci cliente"
+                            >
+                              <Clipboard size={16} />
+                            </button>
+                          </div>
+                        </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                           {client.nome || 'N/D'}
                         </td>
@@ -265,14 +343,6 @@ const TrainerDashboard = () => {
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                           {new Date(client.created_at).toLocaleDateString('it-IT')}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                          <Link 
-                            to={`/trainer/client/${client.id}`}
-                            className="text-blue-600 hover:text-blue-900 mr-4"
-                          >
-                            Gestisci Piano
-                          </Link>
                         </td>
                       </tr>
                     ))}

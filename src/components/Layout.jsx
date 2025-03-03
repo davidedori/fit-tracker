@@ -84,15 +84,15 @@ const Layout = () => {
       </nav>
 
       {/* Mobile bottom navigation */}
-      <div className="fixed bottom-0 left-0 right-0 bg-white border-t md:hidden z-[200]">
-        <div className="grid grid-cols-4 h-16">
+      <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-[100]">
+        <div className="flex justify-around items-center">
           {menuItems.map(item => {
             const Icon = item.icon
             return (
               <Link
                 key={item.path}
                 to={item.path}
-                className={`flex flex-col items-center justify-center
+                className={`flex flex-1 flex-col items-center py-3 px-1
                   ${isActive(item.path)
                     ? 'text-blue-500'
                     : 'text-gray-500 hover:text-gray-900'

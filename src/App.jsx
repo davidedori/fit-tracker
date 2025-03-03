@@ -4,6 +4,8 @@ import { AuthProvider, useAuth } from './contexts/AuthContext'
 import Layout from './components/Layout'
 import Login from './components/Auth/Login'
 import Register from './components/Auth/Register'
+import ResetPassword from './components/Auth/ResetPassword'
+import UpdatePassword from './components/Auth/UpdatePassword'
 import WeeklyPlanner from './components/Planner/WeeklyPlanner'
 import WorkoutMode from './components/Workout/WorkoutMode'
 import Profile from './components/Profile/Profile'
@@ -37,6 +39,8 @@ function App() {
         <Routes>
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
+          <Route path="/reset-password" element={<ResetPassword />} />
+          <Route path="/update-password" element={<UpdatePassword />} />
           <Route path="/auth/callback" element={<AuthCallback />} />
           <Route element={<Layout />}>
             <Route path="/" element={<HomeRedirect />} />
