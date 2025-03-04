@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { supabase } from '../../services/supabase'
 import { useAuth } from '../../contexts/AuthContext'
-import { User, Calendar, Search, RefreshCw, UserPlus, Clipboard, Settings, ChevronUp, ChevronDown, Trash2 } from 'react-feather'
+import { User, Calendar, Search, RefreshCw, UserPlus, Clipboard, Settings, ChevronUp, ChevronDown, Trash2, Circle, UserCheck, Activity, Check, AlertTriangle, Calendar as CalendarIcon, Edit } from 'react-feather'
 import { Link, useNavigate } from 'react-router-dom'
 import Button from '../common/Button'
 
@@ -34,7 +34,7 @@ const TrainerDashboard = () => {
   }, [])
 
   const fetchClients = async () => {
-    console.log('Inizio fetchClients')
+    console.log('fetchClients iniziato')
     setLoading(true)
     setError(null)
     
@@ -70,60 +70,101 @@ const TrainerDashboard = () => {
       
       console.log('Dati clienti ricevuti:', data)
       
-      // Se non ci sono email, recuperale dalla tabella auth.users
-      if (data && data.length > 0) {
-        console.log('Recupero email degli utenti')
-        
-        // Ottieni le email dalla tabella auth.users
-        const clientsWithEmails = await Promise.all(data.map(async (client) => {
-          try {
-            // Utilizziamo la funzione RPC per ottenere l'email dell'utente
-            const { data: userData, error: userError } = await supabase
-              .rpc('get_user_email', { user_id: client.id })
+      if (data) {
+        try {
+          // Calcola la data di una settimana fa
+          const oneWeekAgo = new Date();
+          oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+          const oneWeekAgoStr = oneWeekAgo.toISOString();
+          
+          // Crea un array di promesse per ottenere le email e i dati di allenamento
+          const clientPromises = data.map(async (client) => {
+            // Ottieni l'email
+            const { data: emailData } = await supabase.rpc('get_user_email', {
+              user_id: client.id
+            });
             
-            if (userError) {
-              console.error('Errore nel recupero email:', userError)
-              return { ...client, email: 'Email non disponibile' }
+            // Controlla se il cliente ha completato allenamenti nell'ultima settimana
+            const { data: recentWorkouts, error: workoutsError } = await supabase
+              .from('workout_logs')
+              .select('*')
+              .eq('user_id', client.id)
+              .gte('created_at', oneWeekAgoStr);
+              
+            if (workoutsError) {
+              console.error('Errore nel recupero degli allenamenti:', workoutsError);
             }
             
-            // La funzione restituisce una tabella, quindi userData è un array
-            return { ...client, email: userData[0]?.email || 'Email non disponibile' }
-          } catch (e) {
-            console.error('Errore nel recupero email per utente:', client.id, e)
-            return { ...client, email: 'Email non disponibile' }
-          }
-        }))
-        
-        console.log('Clienti con email:', clientsWithEmails)
-        setClients(clientsWithEmails)
-        
-        // Calcola le statistiche
-        const now = new Date()
-        const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
-        
-        setStats({
-          totalClients: clientsWithEmails.length,
-          activeClients: clientsWithEmails.length, // Per ora tutti sono considerati attivi
-          newClientsThisMonth: clientsWithEmails.filter(
-            client => new Date(client.created_at) >= firstDayOfMonth
-          ).length
-        })
+            // Controlla se il cliente ha esercizi programmati
+            const { data: scheduledExercises, error: exercisesError } = await supabase
+              .from('exercises')
+              .select('*')
+              .eq('user_id', client.id);
+              
+            if (exercisesError) {
+              console.error('Errore nel recupero degli esercizi:', exercisesError);
+            }
+            
+            // Determina lo stato del cliente
+            const isActive = recentWorkouts && recentWorkouts.length > 0;
+            const hasScheduledExercises = scheduledExercises && scheduledExercises.length > 0;
+            
+            // Determina il colore dell'indicatore
+            let statusColor = 'red'; // Default: rosso (nessun esercizio programmato)
+            
+            if (hasScheduledExercises) {
+              statusColor = isActive ? 'green' : 'amber'; // Verde se attivo, arancione se inattivo
+            }
+            
+            return {
+              ...client,
+              email: emailData?.email || 'Email non disponibile',
+              isActive,
+              hasScheduledExercises,
+              statusColor
+            };
+          });
+          
+          // Attendi che tutte le promesse siano risolte
+          const clientsWithData = await Promise.all(clientPromises);
+          
+          // Calcola le statistiche
+          const totalClients = clientsWithData.length;
+          const activeClients = clientsWithData.filter(client => client.isActive).length;
+          
+          // Calcola i nuovi clienti di questo mese
+          const now = new Date();
+          const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+          const newClients = clientsWithData.filter(client => {
+            const createdAt = new Date(client.created_at);
+            return createdAt >= startOfMonth;
+          }).length;
+          
+          setClients(clientsWithData);
+          setStats({
+            totalClients,
+            activeClients,
+            newClients
+          });
+        } catch (error) {
+          console.error('Errore nel recupero delle email:', error);
+        }
       } else {
-        setClients(data || [])
+        setClients(data || []);
         setStats({
           totalClients: data?.length || 0,
-          activeClients: data?.length || 0,
+          activeClients: 0,
           newClientsThisMonth: 0
-        })
+        });
       }
       
-      console.log('fetchClients completato')
+      console.log('fetchClients completato');
     } catch (e) {
-      console.error('Errore in fetchClients:', e)
-      setError(`Errore: ${e.message}`)
+      console.error('Errore in fetchClients:', e);
+      setError(`Errore: ${e.message}`);
     }
     
-    setLoading(false)
+    setLoading(false);
   }
 
   // Funzione per gestire l'ordinamento
@@ -393,11 +434,27 @@ const TrainerDashboard = () => {
                           <div className="flex justify-center">
                             <div 
                               onClick={() => navigate(`/trainer/client/${client.id}`)}
-                              className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center cursor-pointer hover:bg-blue-200 transition-colors relative"
+                              className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center cursor-pointer hover:bg-blue-200 transition-colors relative"
                               title="Gestisci cliente"
                             >
-                              <User size={16} className="text-blue-600" />
-                              <Settings size={16} className="text-blue-600 absolute bottom-0 right-0 bg-white rounded-full p-0.5" />
+                              <User size={20} className="text-blue-600" />
+                              {/* Indicatore di stato (sistema a semaforo) */}
+                              <div 
+                                className={`absolute -bottom-0.5 -right-0.5 z-10 w-3 h-3 rounded-full border border-white cursor-help ${
+                                  client.statusColor === 'green' 
+                                    ? 'bg-green-500' 
+                                    : client.statusColor === 'amber' 
+                                      ? 'bg-amber-500' 
+                                      : 'bg-red-500'
+                                }`}
+                                title={
+                                  client.statusColor === 'green' 
+                                    ? 'Cliente attivo: ha completato almeno un allenamento nell\'ultima settimana' 
+                                    : client.statusColor === 'amber' 
+                                      ? 'Cliente inattivo: ha esercizi programmati ma non ha completato allenamenti nell\'ultima settimana' 
+                                      : 'Cliente senza esercizi programmati'
+                                }
+                              />
                             </div>
                           </div>
                         </td>
@@ -415,8 +472,10 @@ const TrainerDashboard = () => {
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm">
                           <div className="flex justify-center">
-                            <button
-                              onClick={() => setDeletingClient(client)}
+                            <button 
+                              onClick={() => {
+                                setDeletingClient(client);
+                              }}
                               className="p-1 text-red-500 hover:text-red-700"
                               title="Elimina cliente"
                             >

@@ -7,7 +7,7 @@ import WorkoutLogItem from './WorkoutLogItem';
 import Button from '../common/Button';
 import WorkoutStats from './WorkoutStats';
 
-const WorkoutHistory = () => {
+const WorkoutHistory = ({ externalUserId }) => {
   const { user } = useAuth();
   const [workoutLogs, setWorkoutLogs] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -37,17 +37,25 @@ const WorkoutHistory = () => {
   // Calcola il numero totale di pagine
   const totalPages = Math.ceil(totalCount / logsPerPage);
 
+  // Determina l'ID utente da utilizzare (externalUserId se fornito, altrimenti l'utente corrente)
+  const userId = externalUserId || (user ? user.id : null);
+  
+  // Determina se l'utente corrente è il proprietario dei dati
+  const isOwner = !externalUserId || (user && externalUserId === user.id);
+
   useEffect(() => {
-    fetchWorkoutLogs();
-    fetchTotalCount();
-  }, [filter, page]);
+    if (userId) {
+      fetchWorkoutLogs();
+      fetchTotalCount();
+    }
+  }, [filter, page, userId]);
 
   const fetchTotalCount = async () => {
     try {
       let query = supabase
         .from('workout_logs')
         .select('id', { count: 'exact' })
-        .eq('user_id', user.id);
+        .eq('user_id', userId);
       
       if (filter !== 'all') {
         const dayNumber = parseInt(filter);
@@ -69,7 +77,7 @@ const WorkoutHistory = () => {
       const { count: totalCount, error: totalError } = await supabase
         .from('workout_logs')
         .select('id', { count: 'exact' })
-        .eq('user_id', user.id);
+        .eq('user_id', userId);
         
       if (totalError) throw totalError;
       
@@ -77,7 +85,7 @@ const WorkoutHistory = () => {
       const { data: allLogs, error: logsError } = await supabase
         .from('workout_logs')
         .select('completed_at')
-        .eq('user_id', user.id)
+        .eq('user_id', userId)
         .order('completed_at', { ascending: false });
         
       if (logsError) throw logsError;
@@ -140,7 +148,7 @@ const WorkoutHistory = () => {
       let query = supabase
         .from('workout_logs')
         .select('*')
-        .eq('user_id', user.id)
+        .eq('user_id', userId)
         .order('completed_at', { ascending: false })
         .range(page * logsPerPage, (page * logsPerPage) + logsPerPage - 1);
 
@@ -165,6 +173,9 @@ const WorkoutHistory = () => {
   };
 
   const handleDeleteLog = async (logId) => {
+    // Solo il proprietario può eliminare i log
+    if (!isOwner) return;
+    
     try {
       const { error } = await supabase
         .from('workout_logs')
@@ -197,6 +208,9 @@ const WorkoutHistory = () => {
 
   // Funzione per salvare le note modificate
   const handleSaveNotes = async () => {
+    // Solo il proprietario può modificare le note
+    if (!isOwner) return;
+    
     try {
       const { error } = await supabase
         .from('workout_logs')
@@ -224,9 +238,9 @@ const WorkoutHistory = () => {
   };
 
   return (
-    <div className="container mx-auto px-4 py-8 mb-20">
-      <div className="max-w-4xl mx-auto">
-        <h1 className="text-2xl font-bold mb-6">Storico Allenamenti</h1>
+    <div className="container mx-auto px-4 py-2">
+      <div className="max-w-6xl mx-auto">
+        {!externalUserId && <h1 className="text-2xl font-bold mb-6">Storico Allenamenti</h1>}
         
         {/* Statistiche */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
@@ -266,43 +280,55 @@ const WorkoutHistory = () => {
         )}
         
         {/* Filtri */}
-        <div className="mb-6">
-          <div className="flex items-center gap-2 mb-2">
-            <Filter size={16} className="text-gray-500" />
-            <h2 className="text-sm font-medium text-gray-700">Filtra per giorno</h2>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <Button 
-              onClick={() => {
-                setFilter('all');
-                setPage(0); // Reset alla prima pagina quando cambia il filtro
-              }}
-              variant={filter === 'all' ? 'primary' : 'outline'}
-              className="text-xs py-1 px-3"
+        <div className="flex justify-between items-center mb-4">
+          <div className="flex items-center">
+            <Filter size={16} className="text-gray-500 mr-2" />
+            <select
+              value={filter}
+              onChange={(e) => setFilter(e.target.value)}
+              className="bg-white border border-gray-300 rounded-md text-sm py-1 px-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
-              Tutti
-            </Button>
-            {dayNames.map((day, index) => (
-              <Button 
-                key={index + 1}
-                onClick={() => {
-                  setFilter((index + 1).toString());
-                  setPage(0); // Reset alla prima pagina quando cambia il filtro
-                }}
-                variant={filter === (index + 1).toString() ? 'primary' : 'outline'}
-                className="text-xs py-1 px-3"
-              >
-                {day}
-              </Button>
-            ))}
+              <option value="all">Tutti i giorni</option>
+              {dayNames.map((day, index) => (
+                <option key={index} value={index + 1}>
+                  {day}
+                </option>
+              ))}
+            </select>
           </div>
+          
+          {/* Paginazione */}
+          {totalPages > 1 && (
+            <div className="flex items-center space-x-2">
+              <button
+                onClick={handlePrevPage}
+                disabled={page === 0}
+                className={`p-1 rounded ${
+                  page === 0 ? 'text-gray-300 cursor-not-allowed' : 'text-gray-600 hover:bg-gray-100'
+                }`}
+              >
+                <ChevronLeft size={20} />
+              </button>
+              <span className="text-sm text-gray-600">
+                Pagina {page + 1} di {totalPages}
+              </span>
+              <button
+                onClick={handleNextPage}
+                disabled={page >= totalPages - 1}
+                className={`p-1 rounded ${
+                  page >= totalPages - 1 ? 'text-gray-300 cursor-not-allowed' : 'text-gray-600 hover:bg-gray-100'
+                }`}
+              >
+                <ChevronRight size={20} />
+              </button>
+            </div>
+          )}
         </div>
         
         {/* Lista allenamenti */}
         {loading ? (
-          <div className="text-center py-10">
-            <div className="inline-block animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500"></div>
-            <p className="mt-2 text-gray-600">Caricamento...</p>
+          <div className="flex justify-center items-center h-64">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
           </div>
         ) : workoutLogs.length > 0 ? (
           <>
@@ -320,91 +346,60 @@ const WorkoutHistory = () => {
                     <Info size={18} />
                   </button>
                   
-                  {/* Pulsante elimina */}
-                  <button 
-                    onClick={() => setDeleteConfirm(log.id)}
-                    className="absolute top-4 right-4 text-gray-400 hover:text-red-500 transition-colors"
-                    aria-label="Elimina allenamento"
-                  >
-                    <Trash2 size={18} />
-                  </button>
-                  
-                  {/* Modale conferma eliminazione */}
-                  {deleteConfirm === log.id && (
-                    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-[300]">
-                      <div className="bg-white rounded-lg max-w-md w-full">
-                        <div className="p-6">
-                          <h3 className="text-lg font-medium mb-4">Conferma eliminazione</h3>
-                          <p className="text-gray-600 mb-6">
-                            Sei sicuro di voler eliminare questo allenamento? Questa azione non può essere annullata.
-                          </p>
-                          <div className="flex justify-end gap-3">
-                            <Button 
-                              onClick={() => setDeleteConfirm(null)}
-                              variant="outline"
-                              className="px-4 py-2"
-                            >
-                              Annulla
-                            </Button>
-                            <Button 
-                              onClick={() => handleDeleteLog(log.id)}
-                              variant="danger"
-                              className="px-4 py-2"
-                            >
-                              Elimina
-                            </Button>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
+                  {/* Pulsante elimina (solo per il proprietario) */}
+                  {isOwner && (
+                    <button 
+                      onClick={() => setDeleteConfirm(log.id)}
+                      className="absolute top-4 right-4 text-gray-400 hover:text-red-500 transition-colors"
+                      aria-label="Elimina allenamento"
+                    >
+                      <Trash2 size={18} />
+                    </button>
                   )}
                 </div>
               ))}
             </div>
             
-            {/* Paginazione */}
-            {totalPages > 1 && (
-              <div className="flex justify-between items-center mt-6 mb-6 bg-white p-3 rounded-lg shadow-sm">
-                <Button
-                  onClick={handlePrevPage}
-                  disabled={page === 0}
-                  variant="outline"
-                  className={`flex items-center gap-1 ${page === 0 ? 'opacity-50 cursor-not-allowed' : ''}`}
-                >
-                  <ChevronLeft size={16} />
-                  Precedente
-                </Button>
-                
-                <div className="text-sm text-gray-600">
-                  Pagina {page + 1} di {totalPages}
+            {/* Modale conferma eliminazione */}
+            {deleteConfirm && (
+              <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-[300]">
+                <div className="bg-white rounded-lg p-6 max-w-sm w-full">
+                  <h3 className="text-lg font-medium mb-4">Conferma eliminazione</h3>
+                  <p className="mb-6">Sei sicuro di voler eliminare questo allenamento? Questa azione non può essere annullata.</p>
+                  <div className="flex justify-end gap-2">
+                    <Button 
+                      onClick={() => setDeleteConfirm(null)}
+                      variant="outline"
+                    >
+                      Annulla
+                    </Button>
+                    <Button 
+                      onClick={() => handleDeleteLog(deleteConfirm)}
+                      variant="danger"
+                    >
+                      Elimina
+                    </Button>
+                  </div>
                 </div>
-                
-                <Button
-                  onClick={handleNextPage}
-                  disabled={page >= totalPages - 1}
-                  variant="outline"
-                  className={`flex items-center gap-1 ${page >= totalPages - 1 ? 'opacity-50 cursor-not-allowed' : ''}`}
-                >
-                  Successiva
-                  <ChevronRight size={16} />
-                </Button>
               </div>
             )}
           </>
         ) : (
-          <div className="text-center py-10 bg-gray-50 rounded-lg">
-            <Calendar size={40} className="mx-auto text-gray-400 mb-3" />
-            <h3 className="text-lg font-medium text-gray-700 mb-1">Nessun allenamento trovato</h3>
-            <p className="text-gray-500">
-              {filter === 'all' 
-                ? "Non hai ancora registrato alcun allenamento" 
-                : `Non hai ancora completato allenamenti di ${dayNames[parseInt(filter) - 1]}`}
-            </p>
+          <div className="bg-gray-50 p-8 rounded-lg text-center">
+            <p className="text-gray-500 mb-4">Nessun allenamento registrato.</p>
+            {!externalUserId && (
+              <Button 
+                onClick={() => navigate('/workout')}
+                variant="primary"
+              >
+                Inizia un allenamento
+              </Button>
+            )}
           </div>
         )}
       </div>
       
-      {/* Modale dettagli log */}
+      {/* Modale dettagli */}
       {detailLog && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-[300]">
           <div className="bg-white rounded-lg max-w-lg w-full max-h-[80vh] overflow-y-auto">
@@ -432,7 +427,7 @@ const WorkoutHistory = () => {
                 <div>
                   <div className="flex justify-between items-center">
                     <h3 className="text-sm font-medium text-gray-500">Note</h3>
-                    {!isEditingNotes ? (
+                    {isOwner && !isEditingNotes ? (
                       <button 
                         onClick={() => {
                           setEditedNotes(detailLog.notes || '');
@@ -443,7 +438,7 @@ const WorkoutHistory = () => {
                       >
                         <Edit size={16} />
                       </button>
-                    ) : (
+                    ) : isOwner && isEditingNotes ? (
                       <button 
                         onClick={handleSaveNotes}
                         className="text-gray-400 hover:text-green-500 transition-colors"
@@ -451,7 +446,7 @@ const WorkoutHistory = () => {
                       >
                         <Save size={16} />
                       </button>
-                    )}
+                    ) : null}
                   </div>
                   
                   {!isEditingNotes ? (

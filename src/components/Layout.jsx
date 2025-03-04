@@ -107,7 +107,7 @@ const Layout = () => {
       </div>
 
       <main className="py-6 mb-16 md:mb-0">
-        <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
           <Outlet />
         </div>
       </main>

@@ -241,7 +241,7 @@ const Profile = () => {
       {!isTrainer && (
         <>
           {/* Box allenamento di oggi o pianificazione */}
-          <div className="max-w-4xl mx-auto mb-8">
+          <div className="max-w-6xl mx-auto mb-8">
             <div className="bg-white rounded-lg shadow-sm p-6 hover:shadow-md transition-shadow">
               {!hasAnyExercises ? (
                 <>

@@ -15,6 +15,7 @@ import {
 } from 'react-feather'
 import WeeklyPlanner from '../Planner/WeeklyPlanner'
 import Button from '../common/Button'
+import WorkoutHistory from '../History/WorkoutHistory'
 
 const ClientPlanner = () => {
   const { clientId } = useParams()
@@ -23,7 +24,7 @@ const ClientPlanner = () => {
   const [clientData, setClientData] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
-  const [activeTab, setActiveTab] = useState('overview')
+  const [activeTab, setActiveTab] = useState('workoutHistory')
   const [stats, setStats] = useState({
     plannedDays: 0,
     totalExercises: 0,
@@ -160,7 +161,9 @@ const ClientPlanner = () => {
   }
 
   const getDayName = (dayIndex) => {
-    return dayNames[dayIndex] || 'Sconosciuto'
+    // Sottraiamo 1 dall'indice perché dayNames è un array 0-based (0=Lunedì),
+    // mentre day_of_week nel database è 1-based (1=Lunedì)
+    return dayNames[dayIndex - 1] || 'Sconosciuto'
   }
 
   if (loading) {
@@ -227,7 +230,7 @@ const ClientPlanner = () => {
           </div>
           
           {/* Statistiche */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 gap-4 mb-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
             <div className="bg-white rounded-lg shadow-sm p-4">
               <div className="flex items-center">
                 <div className="p-2 bg-blue-50 rounded-full mr-3">
@@ -253,7 +256,7 @@ const ClientPlanner = () => {
             </div>
             
             {clientData.logs && clientData.logs.length > 0 && (
-              <div className="bg-white rounded-lg shadow-sm p-4 sm:col-span-2">
+              <div className="bg-white rounded-lg shadow-sm p-4">
                 <div className="flex items-center">
                   <div className="p-2 bg-purple-50 rounded-full mr-3">
                     <Clock className="h-5 w-5 text-purple-500" />
@@ -275,13 +278,13 @@ const ClientPlanner = () => {
             <div className="flex border-b border-gray-200">
               <button
                 className={`py-2 px-4 font-medium ${
-                  activeTab === 'overview'
+                  activeTab === 'workoutHistory'
                     ? 'text-blue-600 border-b-2 border-blue-600'
                     : 'text-gray-500 hover:text-gray-700'
                 }`}
-                onClick={() => setActiveTab('overview')}
+                onClick={() => setActiveTab('workoutHistory')}
               >
-                Panoramica
+                Ultimi Allenamenti
               </button>
               <button
                 className={`py-2 px-4 font-medium ${
@@ -296,101 +299,9 @@ const ClientPlanner = () => {
             </div>
             
             <div className="bg-white rounded-lg shadow-md overflow-hidden">
-              {activeTab === 'overview' ? (
-                <div className="p-6 space-y-8">
-                  {/* Tabella esercizi */}
-                  <div>
-                    <h3 className="text-lg font-medium mb-4">Esercizi Programmati</h3>
-                    
-                    {clientData.exercises.length === 0 ? (
-                      <div className="bg-gray-50 p-4 rounded text-center text-gray-500">
-                        Nessun esercizio programmato per questo cliente.
-                      </div>
-                    ) : (
-                      <div className="overflow-x-auto">
-                        <table className="min-w-full divide-y divide-gray-200">
-                          <thead className="bg-gray-50">
-                            <tr>
-                              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                Giorno
-                              </th>
-                              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                Esercizio
-                              </th>
-                              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                Dettagli
-                              </th>
-                              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                Parte del Corpo
-                              </th>
-                            </tr>
-                          </thead>
-                          <tbody className="bg-white divide-y divide-gray-200">
-                            {clientData.exercises.map((exercise) => (
-                              <tr key={exercise.id} className="hover:bg-gray-50">
-                                <td className="px-6 py-4 whitespace-nowrap">
-                                  {dayNames[exercise.day_of_week - 1]}
-                                </td>
-                                <td className="px-6 py-4">
-                                  <div className="font-medium text-gray-900">{exercise.name}</div>
-                                  <div className="text-sm text-gray-500">{exercise.equipment}</div>
-                                </td>
-                                <td className="px-6 py-4 whitespace-nowrap">
-                                  {exercise.mode === 'reps' ? (
-                                    <span>{exercise.sets} serie × {exercise.reps} ripetizioni</span>
-                                  ) : (
-                                    <span>Timer: {exercise.duration}s</span>
-                                  )}
-                                  {exercise.rest > 0 && <span className="text-gray-500"> • {exercise.rest}s pausa</span>}
-                                </td>
-                                <td className="px-6 py-4 whitespace-nowrap">
-                                  {exercise.body_part || '-'}
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    )}
-                  </div>
-                  
-                  {/* Ultimi allenamenti */}
-                  <div>
-                    <h3 className="text-lg font-medium mb-4">Ultimi Allenamenti</h3>
-                    
-                    {clientData.logs.length === 0 ? (
-                      <div className="bg-gray-50 p-4 rounded text-center text-gray-500">
-                        Nessun allenamento registrato da questo cliente.
-                      </div>
-                    ) : (
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {clientData.logs.map(log => (
-                          <div key={log.id} className="border border-gray-200 rounded-lg p-4">
-                            <div className="flex justify-between">
-                              <div>
-                                <p className="font-bold">{getDayName(log.day_of_week)}</p>
-                                <p className="text-gray-600">
-                                  {new Date(log.completed_at).toLocaleDateString('it-IT')} - 
-                                  {new Date(log.completed_at).toLocaleTimeString('it-IT', {hour: '2-digit', minute:'2-digit'})}
-                                </p>
-                              </div>
-                              <div className="flex items-center">
-                                <Clock className="text-gray-400 mr-1" size={16} />
-                                <span>{log.duration_minutes} min</span>
-                                <Activity className="text-gray-400 ml-3 mr-1" size={16} />
-                                <span>{log.exercise_count} esercizi</span>
-                              </div>
-                            </div>
-                            {log.notes && (
-                              <div className="mt-2 bg-gray-50 p-2 rounded">
-                                <p className="text-sm text-gray-700">{log.notes}</p>
-                              </div>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
+              {activeTab === 'workoutHistory' ? (
+                <div className="p-6">
+                  <WorkoutHistory externalUserId={clientId} />
                 </div>
               ) : (
                 <div className="p-6">
