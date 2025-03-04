@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../../services/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { dayNames } from '../../constants/days';
-import { Calendar, Clock, Activity, Filter, ChevronLeft, ChevronRight, Trash2, Info, Edit, Save } from 'react-feather';
+import { Calendar, Clock, Activity, Filter, ChevronLeft, ChevronRight, Trash2, Info, Edit, Save, Award } from 'react-feather';
 import WorkoutLogItem from './WorkoutLogItem';
 import Button from '../common/Button';
 import WorkoutStats from './WorkoutStats';
@@ -231,19 +231,31 @@ const WorkoutHistory = () => {
         {/* Statistiche */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
           <div className="bg-white p-4 rounded-lg shadow-sm">
-            <p className="text-sm text-gray-500">Totale</p>
+            <div className="flex items-center gap-2 mb-1">
+              <Activity size={18} className="text-blue-500" />
+              <p className="text-sm text-gray-500">Totale</p>
+            </div>
             <p className="text-2xl font-bold">{stats.total}</p>
           </div>
           <div className="bg-white p-4 rounded-lg shadow-sm">
-            <p className="text-sm text-gray-500">Questa settimana</p>
+            <div className="flex items-center gap-2 mb-1">
+              <Calendar size={18} className="text-blue-500" />
+              <p className="text-sm text-gray-500">Questa settimana</p>
+            </div>
             <p className="text-2xl font-bold">{stats.thisWeek}</p>
           </div>
           <div className="bg-white p-4 rounded-lg shadow-sm">
-            <p className="text-sm text-gray-500">Questo mese</p>
+            <div className="flex items-center gap-2 mb-1">
+              <Calendar size={18} className="text-blue-500" />
+              <p className="text-sm text-gray-500">Questo mese</p>
+            </div>
             <p className="text-2xl font-bold">{stats.thisMonth}</p>
           </div>
           <div className="bg-white p-4 rounded-lg shadow-sm">
-            <p className="text-sm text-gray-500">Serie attuale</p>
+            <div className="flex items-center gap-2 mb-1">
+              <Award size={18} className="text-blue-500" />
+              <p className="text-sm text-gray-500">Serie attuale</p>
+            </div>
             <p className="text-2xl font-bold">{stats.streak} {stats.streak === 1 ? 'giorno' : 'giorni'}</p>
           </div>
         </div>
