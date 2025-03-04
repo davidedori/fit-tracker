@@ -45,7 +45,16 @@ const InviteUsers = () => {
       
       if (error) throw error
       
-      setInvitations(data || [])
+      // Aggiungiamo un flag per gli inviti scaduti
+      const processedData = data.map(invite => {
+        const isExpired = invite.expires_at && new Date(invite.expires_at) < new Date();
+        return {
+          ...invite,
+          is_expired: isExpired
+        };
+      });
+      
+      setInvitations(processedData || [])
     } catch (error) {
       console.error('Errore durante il recupero degli inviti:', error)
       setError('Impossibile caricare gli inviti')
@@ -79,8 +88,9 @@ const InviteUsers = () => {
       
       // Filtra per stato
       if (statusFilter === 'all') return matchesSearch;
-      if (statusFilter === 'pending') return matchesSearch && !invite.is_accepted;
+      if (statusFilter === 'pending') return matchesSearch && !invite.is_accepted && !invite.is_expired;
       if (statusFilter === 'accepted') return matchesSearch && invite.is_accepted;
+      if (statusFilter === 'expired') return matchesSearch && invite.is_expired && !invite.is_accepted;
       
       return matchesSearch;
     });
@@ -130,6 +140,10 @@ const InviteUsers = () => {
       // Genera un token casuale
       const token = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15)
       
+      // Calcola la data di scadenza (7 giorni da oggi)
+      const expiresAt = new Date()
+      expiresAt.setDate(expiresAt.getDate() + 7)
+      
       // Salva l'invito nel database
       const { data, error } = await supabase
         .from('user_invitations')
@@ -137,7 +151,8 @@ const InviteUsers = () => {
           { 
             email, 
             token,
-            invited_by: user.id
+            invited_by: user.id,
+            expires_at: expiresAt.toISOString() // Aggiungi la data di scadenza
           }
         ])
         .select()
@@ -192,6 +207,34 @@ const InviteUsers = () => {
     navigator.clipboard.writeText(inviteUrl)
     setCopiedInviteId(inviteId)
     setTimeout(() => setCopiedInviteId(null), 2000)
+  }
+
+  const handleRenewInvite = async (inviteId) => {
+    try {
+      // Calcola la nuova data di scadenza (7 giorni da oggi)
+      const expiresAt = new Date()
+      expiresAt.setDate(expiresAt.getDate() + 7)
+      
+      // Aggiorna l'invito nel database
+      const { error } = await supabase
+        .from('user_invitations')
+        .update({
+          expires_at: expiresAt.toISOString()
+        })
+        .eq('id', inviteId)
+      
+      if (error) throw error
+      
+      // Aggiorna la lista degli inviti
+      fetchInvitations()
+      setSuccess('Invito rinnovato con successo')
+      
+      // Nascondi il messaggio di successo dopo 3 secondi
+      setTimeout(() => setSuccess(null), 3000)
+    } catch (error) {
+      console.error('Errore durante il rinnovo dell\'invito:', error)
+      setError('Impossibile rinnovare l\'invito: ' + error.message)
+    }
   }
 
   return (
@@ -292,6 +335,7 @@ const InviteUsers = () => {
                 <option value="all">Tutti</option>
                 <option value="pending">In attesa</option>
                 <option value="accepted">Accettati</option>
+                <option value="expired">Scaduti</option>
               </select>
             </div>
           </div>
@@ -331,6 +375,9 @@ const InviteUsers = () => {
                     </div>
                   </th>
                   <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Scade il
+                  </th>
+                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Azioni
                   </th>
                 </tr>
@@ -343,6 +390,12 @@ const InviteUsers = () => {
                         <div className="flex items-center justify-center">
                           <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center">
                             <Check size={16} className="text-green-600" />
+                          </div>
+                        </div>
+                      ) : invite.is_expired ? (
+                        <div className="flex items-center justify-center">
+                          <div className="w-8 h-8 rounded-full bg-red-100 flex items-center justify-center">
+                            <AlertCircle size={16} className="text-red-600" />
                           </div>
                         </div>
                       ) : (
@@ -365,23 +418,49 @@ const InviteUsers = () => {
                         minute: '2-digit'
                       })}
                     </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {invite.expires_at ? (
+                        new Date(invite.expires_at).toLocaleDateString('it-IT', {
+                          day: '2-digit',
+                          month: '2-digit',
+                          year: 'numeric'
+                        })
+                      ) : (
+                        'Non specificato'
+                      )}
+                      {invite.is_expired && !invite.is_accepted && (
+                        <span className="ml-2 text-xs text-red-600 font-medium">Scaduto</span>
+                      )}
+                    </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm">
                       <div className="flex space-x-2">
                         {!invite.is_accepted && (
-                          <button 
-                            onClick={() => copyInviteLink(invite.id, invite.token)}
-                            className="p-1 text-blue-600 hover:text-blue-800 relative"
-                            title="Copia link di invito"
-                          >
-                            {copiedInviteId === invite.id ? <Check size={16} /> : <Share2 size={16} />}
-                            
-                            {/* Tooltip di feedback */}
-                            {copiedInviteId === invite.id && (
-                              <span className="absolute -top-8 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white text-xs rounded py-1 px-2 whitespace-nowrap">
-                                Link copiato!
-                              </span>
+                          <>
+                            {invite.is_expired ? (
+                              <button 
+                                onClick={() => handleRenewInvite(invite.id)}
+                                className="p-1 text-green-600 hover:text-green-800 relative"
+                                title="Rinnova invito"
+                              >
+                                <RefreshCw size={16} />
+                              </button>
+                            ) : (
+                              <button 
+                                onClick={() => copyInviteLink(invite.id, invite.token)}
+                                className="p-1 text-blue-600 hover:text-blue-800 relative"
+                                title="Copia link di invito"
+                              >
+                                {copiedInviteId === invite.id ? <Check size={16} /> : <Share2 size={16} />}
+                                
+                                {/* Tooltip di feedback */}
+                                {copiedInviteId === invite.id && (
+                                  <span className="absolute -top-8 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white text-xs rounded py-1 px-2 whitespace-nowrap">
+                                    Link copiato!
+                                  </span>
+                                )}
+                              </button>
                             )}
-                          </button>
+                          </>
                         )}
                         <button 
                           onClick={() => setDeletingInvite(invite.id)}

@@ -55,9 +55,18 @@ const Register = () => {
           console.log('Risultato query invito:', data)
           
           if (data && data.length > 0) {
-            setIsInvited(true)
-            setInvitedEmail(data[0].email)
-            setEmail(data[0].email)
+            // Verifica se l'invito è scaduto
+            const inviteData = data[0];
+            const isExpired = inviteData.expires_at && new Date(inviteData.expires_at) < new Date();
+            
+            if (isExpired) {
+              console.log('Invito scaduto:', inviteToken);
+              setError('Questo invito è scaduto. Richiedi un nuovo invito.');
+            } else {
+              setIsInvited(true);
+              setInvitedEmail(inviteData.email);
+              setEmail(inviteData.email);
+            }
           } else {
             console.log('Nessun invito trovato per il token:', inviteToken)
             setError('Invito non valido o già utilizzato')
