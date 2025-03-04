@@ -381,27 +381,23 @@ const TrainerDashboard = () => {
                           <span className="ml-1">{getSortIcon('created_at')}</span>
                         </div>
                       </th>
+                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Azioni
+                      </th>
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
                     {sortedAndFilteredClients.map((client) => (
                       <tr key={client.id} className="hover:bg-gray-50">
                         <td className="px-3 py-4 whitespace-nowrap text-sm">
-                          <div className="flex justify-center space-x-2">
-                            <button
+                          <div className="flex justify-center">
+                            <div 
                               onClick={() => navigate(`/trainer/client/${client.id}`)}
-                              className="p-1 text-blue-600 hover:text-blue-800"
+                              className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center cursor-pointer hover:bg-blue-200 transition-colors"
                               title="Gestisci cliente"
                             >
-                              <Clipboard size={16} />
-                            </button>
-                            <button
-                              onClick={() => setDeletingClient(client)}
-                              className="p-1 text-red-500 hover:text-red-700"
-                              title="Elimina cliente"
-                            >
-                              <Trash2 size={16} />
-                            </button>
+                              <Clipboard size={16} className="text-blue-600" />
+                            </div>
                           </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
@@ -415,6 +411,17 @@ const TrainerDashboard = () => {
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                           {new Date(client.created_at).toLocaleDateString('it-IT')}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm">
+                          <div className="flex justify-center">
+                            <button
+                              onClick={() => setDeletingClient(client)}
+                              className="p-1 text-red-500 hover:text-red-700"
+                              title="Elimina cliente"
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     ))}
