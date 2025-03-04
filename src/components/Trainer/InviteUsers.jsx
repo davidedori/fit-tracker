@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { supabase } from '../../services/supabase'
 import { useAuth } from '../../contexts/AuthContext'
-import { Mail, RefreshCw, Link as LinkIcon, Check, AlertCircle, Copy, Trash2, X, Search, ExternalLink, Share2, ChevronUp, ChevronDown, Filter } from 'react-feather'
+import { Mail, RefreshCw, Link as LinkIcon, Check, AlertCircle, Copy, Trash2, X, Search, ExternalLink, Share2, ChevronUp, ChevronDown, Filter, Clock } from 'react-feather'
 import Button from '../common/Button'
 import Input from '../common/Input'
 
@@ -315,6 +315,9 @@ const InviteUsers = () => {
               <thead className="bg-gray-50">
                 <tr>
                   <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    
+                  </th>
+                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Email
                   </th>
                   <th 
@@ -323,12 +326,9 @@ const InviteUsers = () => {
                     onClick={() => requestSort('created_at')}
                   >
                     <div className="flex items-center">
-                      Data Invio
+                      Creato il
                       <span className="ml-1">{getSortIcon('created_at')}</span>
                     </div>
-                  </th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Stato
                   </th>
                   <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Azioni
@@ -338,6 +338,21 @@ const InviteUsers = () => {
               <tbody className="bg-white divide-y divide-gray-200">
                 {filteredAndSortedInvitations.map((invite) => (
                   <tr key={invite.id} className="hover:bg-gray-50">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm">
+                      {invite.is_accepted ? (
+                        <div className="flex items-center justify-center">
+                          <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center">
+                            <Check size={16} className="text-green-600" />
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="flex items-center justify-center">
+                          <div className="w-8 h-8 rounded-full bg-yellow-100 flex items-center justify-center">
+                            <Clock size={16} className="text-yellow-600" />
+                          </div>
+                        </div>
+                      )}
+                    </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                       <div className="flex items-center">
                         <Mail size={16} className="mr-2 text-gray-400" />
@@ -352,17 +367,6 @@ const InviteUsers = () => {
                         hour: '2-digit',
                         minute: '2-digit'
                       })}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm">
-                      {invite.is_accepted ? (
-                        <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
-                          Accettato
-                        </span>
-                      ) : (
-                        <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800">
-                          In attesa
-                        </span>
-                      )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm">
                       <div className="flex space-x-2">

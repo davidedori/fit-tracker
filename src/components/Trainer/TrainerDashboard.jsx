@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react'
 import { supabase } from '../../services/supabase'
 import { useAuth } from '../../contexts/AuthContext'
-import { User, Calendar, Search, RefreshCw, UserPlus, Clipboard, Settings, ChevronUp, ChevronDown } from 'react-feather'
+import { User, Calendar, Search, RefreshCw, UserPlus, Clipboard, Settings, ChevronUp, ChevronDown, Trash2 } from 'react-feather'
 import { Link, useNavigate } from 'react-router-dom'
+import Button from '../common/Button'
 
 const TrainerDashboard = () => {
   const { user, isTrainer } = useAuth()
@@ -16,6 +17,8 @@ const TrainerDashboard = () => {
     activeClients: 0,
     newClientsThisMonth: 0
   })
+  const [deletingClient, setDeletingClient] = useState(null)
+  const [isDeleting, setIsDeleting] = useState(false)
   const navigate = useNavigate()
 
   useEffect(() => {
@@ -139,6 +142,68 @@ const TrainerDashboard = () => {
     }
     // Mostra sempre un'icona di default (freccia giù più chiara)
     return <ChevronDown size={14} className="text-gray-300" />;
+  };
+
+  // Funzione per eliminare un cliente
+  const handleDeleteClient = async () => {
+    if (!deletingClient) return;
+    
+    setIsDeleting(true);
+    try {
+      // 1. Elimina gli esercizi del cliente
+      const { error: exercisesError } = await supabase
+        .from('exercises')
+        .delete()
+        .eq('user_id', deletingClient.id);
+      
+      if (exercisesError) {
+        console.error('Errore eliminazione esercizi:', exercisesError);
+        throw exercisesError;
+      }
+      
+      // 2. Elimina i log di allenamento
+      const { error: logsError } = await supabase
+        .from('workout_logs')
+        .delete()
+        .eq('user_id', deletingClient.id);
+      
+      if (logsError) {
+        console.error('Errore eliminazione log:', logsError);
+        throw logsError;
+      }
+      
+      // 3. Elimina il profilo utente
+      const { error: profileError } = await supabase
+        .from('user_profiles')
+        .delete()
+        .eq('id', deletingClient.id);
+      
+      if (profileError) {
+        console.error('Errore eliminazione profilo:', profileError);
+        throw profileError;
+      }
+      
+      // 4. Aggiorna la lista dei clienti
+      setClients(clients.filter(client => client.id !== deletingClient.id));
+      
+      // 5. Aggiorna le statistiche
+      setStats({
+        ...stats,
+        totalClients: stats.totalClients - 1,
+        activeClients: stats.activeClients - 1,
+        newClientsThisMonth: new Date(deletingClient.created_at) >= new Date(new Date().getFullYear(), new Date().getMonth(), 1) 
+          ? stats.newClientsThisMonth - 1 
+          : stats.newClientsThisMonth
+      });
+      
+      // 6. Chiudi il modale
+      setDeletingClient(null);
+    } catch (error) {
+      console.error('Errore durante l\'eliminazione del cliente:', error);
+      setError(`Errore durante l'eliminazione: ${error.message}`);
+    } finally {
+      setIsDeleting(false);
+    }
   };
 
   // Filtra e ordina i clienti
@@ -289,7 +354,7 @@ const TrainerDashboard = () => {
                 <table className="min-w-full divide-y divide-gray-200">
                   <thead className="bg-gray-50">
                     <tr>
-                      <th scope="col" className="w-16"></th>
+                      <th scope="col" className="w-24"></th>
                       <th 
                         scope="col" 
                         className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
@@ -322,13 +387,20 @@ const TrainerDashboard = () => {
                     {sortedAndFilteredClients.map((client) => (
                       <tr key={client.id} className="hover:bg-gray-50">
                         <td className="px-3 py-4 whitespace-nowrap text-sm">
-                          <div className="flex justify-center">
+                          <div className="flex justify-center space-x-2">
                             <button
                               onClick={() => navigate(`/trainer/client/${client.id}`)}
                               className="p-1 text-blue-600 hover:text-blue-800"
                               title="Gestisci cliente"
                             >
                               <Clipboard size={16} />
+                            </button>
+                            <button
+                              onClick={() => setDeletingClient(client)}
+                              className="p-1 text-red-500 hover:text-red-700"
+                              title="Elimina cliente"
+                            >
+                              <Trash2 size={16} />
                             </button>
                           </div>
                         </td>
@@ -352,6 +424,39 @@ const TrainerDashboard = () => {
             )}
           </div>
         </>
+      )}
+
+      {/* Modale di conferma eliminazione */}
+      {deletingClient && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-[300]">
+          <div className="bg-white rounded-lg max-w-md w-full">
+            <div className="p-6">
+              <h3 className="text-lg font-medium mb-4">Conferma eliminazione cliente</h3>
+              <p className="text-gray-600 mb-2">
+                Sei sicuro di voler eliminare il cliente <strong>{deletingClient.nome} {deletingClient.cognome}</strong>?
+              </p>
+              <p className="text-red-600 text-sm mb-6">
+                Questa azione eliminerà tutti i dati del cliente, inclusi esercizi e allenamenti. Non può essere annullata.
+              </p>
+              <div className="flex justify-end gap-3">
+                <button 
+                  onClick={() => setDeletingClient(null)}
+                  className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-100"
+                  disabled={isDeleting}
+                >
+                  Annulla
+                </button>
+                <button 
+                  onClick={handleDeleteClient}
+                  className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 disabled:bg-red-400"
+                  disabled={isDeleting}
+                >
+                  {isDeleting ? 'Eliminazione in corso...' : 'Elimina definitivamente'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )
