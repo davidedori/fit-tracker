@@ -19,6 +19,7 @@ const TrainerDashboard = () => {
   })
   const [deletingClient, setDeletingClient] = useState(null)
   const [isDeleting, setIsDeleting] = useState(false)
+  const [showDeleteModal, setShowDeleteModal] = useState(false)
   const navigate = useNavigate()
 
   useEffect(() => {
@@ -80,9 +81,21 @@ const TrainerDashboard = () => {
           // Crea un array di promesse per ottenere le email e i dati di allenamento
           const clientPromises = data.map(async (client) => {
             // Ottieni l'email
-            const { data: emailData } = await supabase.rpc('get_user_email', {
+            const { data: emailData, error: emailError } = await supabase.rpc('get_user_email', {
               user_id: client.id
             });
+            
+            if (emailError) {
+              console.error('Errore nel recupero dell\'email:', emailError);
+            }
+            
+            // Estrai l'email dal risultato
+            let email = 'Email non disponibile';
+            if (emailData && emailData.email) {
+              email = emailData.email;
+            } else if (emailData && Array.isArray(emailData) && emailData.length > 0) {
+              email = emailData[0]?.email || 'Email non disponibile';
+            }
             
             // Controlla se il cliente ha completato allenamenti nell'ultima settimana
             const { data: recentWorkouts, error: workoutsError } = await supabase
@@ -118,7 +131,7 @@ const TrainerDashboard = () => {
             
             return {
               ...client,
-              email: emailData?.email || 'Email non disponibile',
+              email: email,
               isActive,
               hasScheduledExercises,
               statusColor
@@ -135,7 +148,7 @@ const TrainerDashboard = () => {
           // Calcola i nuovi clienti di questo mese
           const now = new Date();
           const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-          const newClients = clientsWithData.filter(client => {
+          const newClientsThisMonth = clientsWithData.filter(client => {
             const createdAt = new Date(client.created_at);
             return createdAt >= startOfMonth;
           }).length;
@@ -144,7 +157,7 @@ const TrainerDashboard = () => {
           setStats({
             totalClients,
             activeClients,
-            newClients
+            newClientsThisMonth
           });
         } catch (error) {
           console.error('Errore nel recupero delle email:', error);
@@ -239,6 +252,7 @@ const TrainerDashboard = () => {
       
       // 6. Chiudi il modale
       setDeletingClient(null);
+      setShowDeleteModal(false);
     } catch (error) {
       console.error('Errore durante l\'eliminazione del cliente:', error);
       setError(`Errore durante l'eliminazione: ${error.message}`);
@@ -475,6 +489,7 @@ const TrainerDashboard = () => {
                             <button 
                               onClick={() => {
                                 setDeletingClient(client);
+                                setShowDeleteModal(true);
                               }}
                               className="p-1 text-red-500 hover:text-red-700"
                               title="Elimina cliente"
@@ -494,7 +509,7 @@ const TrainerDashboard = () => {
       )}
 
       {/* Modale di conferma eliminazione */}
-      {deletingClient && (
+      {showDeleteModal && deletingClient && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-[300]">
           <div className="bg-white rounded-lg max-w-md w-full">
             <div className="p-6">
@@ -507,7 +522,10 @@ const TrainerDashboard = () => {
               </p>
               <div className="flex justify-end gap-3">
                 <button 
-                  onClick={() => setDeletingClient(null)}
+                  onClick={() => {
+                    setDeletingClient(null);
+                    setShowDeleteModal(false);
+                  }}
                   className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-100"
                   disabled={isDeleting}
                 >
@@ -515,10 +533,10 @@ const TrainerDashboard = () => {
                 </button>
                 <button 
                   onClick={handleDeleteClient}
-                  className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 disabled:bg-red-400"
+                  className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50"
                   disabled={isDeleting}
                 >
-                  {isDeleting ? 'Eliminazione in corso...' : 'Elimina definitivamente'}
+                  {isDeleting ? 'Eliminazione in corso...' : 'Elimina'}
                 </button>
               </div>
             </div>
