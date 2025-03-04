@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { supabase } from '../../services/supabase'
 import ExerciseGuide from './ExerciseGuide'
 import { dayNames } from '../../constants/days'
-import { Award, Calendar, ChevronRight, Clock, Activity, BarChart2, AlertCircle, Check } from 'react-feather'
+import { Award, Calendar, ChevronRight, Clock, Activity, BarChart2, AlertCircle, Check, PlayCircle } from 'react-feather'
 import Button from '../common/Button'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
@@ -158,7 +158,7 @@ const WorkoutMode = () => {
   }
 
   return (
-    <div className="max-w-2xl mx-auto p-2 sm:p-4">
+    <div className="max-w-6xl mx-auto p-2 sm:p-4">
       <div className="bg-white rounded-lg shadow-sm p-3 sm:p-6 mb-4 sm:mb-6">
         {/* Header con titolo e selettore giorno */}
         <div className="flex items-center justify-between mb-4 sm:mb-6 border-b pb-3 sm:pb-4">
@@ -196,21 +196,25 @@ const WorkoutMode = () => {
               </div>
             </div>
             
-            {/* Indicatore di progresso migliorato con segmenti separati - solo blu */}
-            <div className="mb-4 sm:mb-6 text-center">
-              <p className="text-xs sm:text-sm text-gray-600 mb-1 sm:mb-2">
+            {/* Card dell'indicatore di progresso */}
+            <div className="mb-4 sm:mb-6 bg-gray-50 p-4 sm:p-5 rounded-lg shadow-sm">
+              <p className="text-xs sm:text-sm text-gray-600 font-medium text-center mb-1 sm:mb-2">
                 Esercizio {currentExercise + 1} di {exercises.length}
               </p>
               
               {/* Barra di progresso segmentata - ottimizzata per mobile */}
-              <div className="flex w-full h-3 sm:h-4 mb-1 sm:mb-2 gap-1">
-                {exercises.map((_, index) => (
+              <div className="flex w-full h-4 sm:h-5 gap-1 sm:gap-1.5">
+                {exercises.map((exercise, index) => (
                   <div 
                     key={index}
-                    className={`flex-1 rounded-md relative
-                      ${index < currentExercise ? 'bg-blue-400' : 
-                        index === currentExercise ? 'bg-blue-600 animate-pulse' : 
-                        'bg-gray-200'}`}
+                    className={`flex-1 rounded-md relative transition-all duration-300 ${
+                      index < currentExercise 
+                        ? 'bg-blue-500' 
+                        : index === currentExercise 
+                          ? 'bg-blue-600 animate-pulse' 
+                          : 'bg-gray-200'
+                    }`}
+                    title={`Esercizio ${index + 1}: ${exercise.name}`}
                   >
                     {/* Mostra i numeri solo su schermi più grandi o se sono pochi esercizi */}
                     {(exercises.length <= 8 || window.innerWidth >= 640) && (
@@ -226,9 +230,12 @@ const WorkoutMode = () => {
               </div>
             </div>
             
-            {/* Sezione esercizio corrente */}
-            <div className="border-t pt-3 sm:pt-4">
-              <h2 className="text-base sm:text-lg font-semibold mb-3 sm:mb-4">Esercizio corrente</h2>
+            {/* Card dell'esercizio corrente */}
+            <div className="bg-white rounded-lg shadow p-4 sm:p-5">
+              <h2 className="text-base sm:text-lg font-semibold mb-3 sm:mb-4 flex items-center">
+                <PlayCircle size={20} className="mr-2 text-blue-500" />
+                Esercizio corrente
+              </h2>
               <ExerciseGuide
                 exercise={exercises[currentExercise]}
                 onComplete={handleExerciseComplete}

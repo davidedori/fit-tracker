@@ -279,7 +279,7 @@ const WeeklyPlanner = ({ externalUserId = null }) => {
 
   return (
     <DragDropContext onDragEnd={handleDragEnd}>
-      <div className="max-w-2xl mx-auto space-y-4">
+      <div className="max-w-6xl mx-auto space-y-4">
         {[1,2,3,4,5,6,7].map(day => (
           <DayPlanner 
             key={day}

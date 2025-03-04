@@ -1,6 +1,75 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import Button from '../common/Button'
-import { Clock, RefreshCw, Award, ChevronRight, Tool, Activity } from 'react-feather'
+import { Clock, RefreshCw, Award, ChevronRight, Tool, Activity, Play, Pause, CheckCircle, SkipForward, FastForward, ThumbsUp } from 'react-feather'
+
+// Componente per le particelle dell'esplosione
+const Particles = () => {
+  // Creiamo un array di particelle con proprietà casuali
+  const particleCount = 20;
+  const particles = [];
+  
+  for (let i = 0; i < particleCount; i++) {
+    const angle = (i / particleCount) * 2 * Math.PI;
+    const distance = 40 + Math.random() * 40;
+    const x = Math.cos(angle) * distance;
+    const y = Math.sin(angle) * distance;
+    const size = 3 + Math.random() * 5;
+    const duration = 1.2 + Math.random() * 0.6; // Durata ancora più lunga
+    const delay = Math.random() * 0.3;
+    
+    // Colori blu per le particelle
+    const colors = ['bg-blue-500', 'bg-blue-400', 'bg-blue-300', 'bg-blue-200'];
+    const color = colors[i % colors.length];
+    
+    particles.push(
+      <div 
+        key={i}
+        className={`absolute rounded-full ${color}`}
+        style={{
+          width: `${size}px`,
+          height: `${size}px`,
+          top: 'calc(50% - 2px)',
+          left: 'calc(50% - 2px)',
+          transform: 'translate(0, 0) scale(0)',
+          opacity: 0,
+          animation: `particle-fly-${i} ${duration}s cubic-bezier(0.25, 0.1, 0.25, 1) ${delay}s forwards`
+        }}
+      />
+    );
+  }
+  
+  // Creiamo le keyframes per ogni particella
+  const keyframes = particles.map((_, i) => {
+    const angle = (i / particleCount) * 2 * Math.PI;
+    const distance = 40 + Math.random() * 40;
+    const x = Math.cos(angle) * distance;
+    const y = Math.sin(angle) * distance;
+    
+    return `
+      @keyframes particle-fly-${i} {
+        0% {
+          transform: translate(0, 0) scale(0);
+          opacity: 0;
+        }
+        25% {
+          transform: translate(${x * 0.3}px, ${y * 0.3}px) scale(1);
+          opacity: 1;
+        }
+        100% {
+          transform: translate(${x}px, ${y}px) scale(0);
+          opacity: 0;
+        }
+      }
+    `;
+  }).join('');
+  
+  return (
+    <div className="absolute inset-0 overflow-hidden">
+      {particles}
+      <style>{keyframes}</style>
+    </div>
+  );
+};
 
 const ExerciseGuide = ({ exercise, onComplete, totalExercises, currentExerciseIndex }) => {
   if (!exercise) {
@@ -17,13 +86,19 @@ const ExerciseGuide = ({ exercise, onComplete, totalExercises, currentExerciseIn
   const [isResting, setIsResting] = useState(false)
   const [showNextExercise, setShowNextExercise] = useState(false)
   const [transitionTimer, setTransitionTimer] = useState(3)
+  const [animateSetChange, setAnimateSetChange] = useState(false)
+  const [displayedSet, setDisplayedSet] = useState(1)
+  const isProcessingRef = useRef(false)
 
   useEffect(() => {
     setTimer(exercise.mode === 'timer' ? exercise.duration : exercise.rest)
     setIsActive(false)
     setCurrentSet(1)
+    setDisplayedSet(1)
     setIsResting(false)
     setShowNextExercise(false)
+    setAnimateSetChange(false)
+    isProcessingRef.current = false
   }, [exercise])
 
   useEffect(() => {
@@ -38,11 +113,6 @@ const ExerciseGuide = ({ exercise, onComplete, totalExercises, currentExerciseIn
         onComplete()
       } else if (isResting) {
         setIsResting(false)
-        if (currentSet < exercise.sets) {
-          setCurrentSet(prev => prev + 1)
-        } else {
-          startTransition()
-        }
       }
     }
     return () => clearInterval(interval)
@@ -67,13 +137,66 @@ const ExerciseGuide = ({ exercise, onComplete, totalExercises, currentExerciseIn
   }
 
   const handleSetComplete = () => {
+    if (isProcessingRef.current || animateSetChange || isResting) return;
+    isProcessingRef.current = true;
+    
     if (currentSet < exercise.sets) {
-      setIsResting(true)
-      setTimer(exercise.rest)
-      setIsActive(true)
+      const nextSet = currentSet + 1;
+      setCurrentSet(nextSet);
+      
+      setAnimateSetChange(true)
+      
+      setTimeout(() => {
+        setDisplayedSet(nextSet)
+      }, 300)
+      
+      setTimeout(() => {
+        setAnimateSetChange(false)
+        setIsResting(true)
+        setTimer(exercise.rest)
+        setIsActive(true)
+        isProcessingRef.current = false;
+      }, 800)
     } else {
       startTransition()
+      isProcessingRef.current = false;
     }
+  }
+
+  const handleSkipSet = () => {
+    if (isProcessingRef.current || animateSetChange || isResting) return;
+    isProcessingRef.current = true;
+    
+    if (currentSet < exercise.sets) {
+      const nextSet = currentSet + 1;
+      setCurrentSet(nextSet);
+      
+      setAnimateSetChange(true)
+      
+      setTimeout(() => {
+        setDisplayedSet(nextSet)
+      }, 300)
+      
+      setTimeout(() => {
+        setAnimateSetChange(false)
+        setIsResting(true)
+        setTimer(exercise.rest)
+        setIsActive(true)
+        isProcessingRef.current = false;
+      }, 800)
+    } else {
+      startTransition();
+      isProcessingRef.current = false;
+    }
+  }
+
+  const handleSkipRest = () => {
+    if (isProcessingRef.current) return;
+    isProcessingRef.current = true;
+    
+    setIsResting(false);
+    setIsActive(false);
+    isProcessingRef.current = false;
   }
 
   const formatTime = (seconds) => {
@@ -126,9 +249,11 @@ const ExerciseGuide = ({ exercise, onComplete, totalExercises, currentExerciseIn
     <div className="bg-white rounded-lg p-6 space-y-6">
       <div className="flex justify-between items-center">
         <h2 className="text-2xl font-bold">{exercise.name}</h2>
-        <span className="text-sm bg-blue-100 text-blue-800 px-3 py-1 rounded-full">
-          {currentExerciseIndex + 1}/{totalExercises}
-        </span>
+        <div className="flex flex-col items-end">
+          <span className="text-sm text-blue-800 font-medium">
+            Esercizio {currentExerciseIndex + 1} di {totalExercises}
+          </span>
+        </div>
       </div>
 
       <div className="flex flex-wrap gap-2 mt-2">
@@ -165,13 +290,15 @@ const ExerciseGuide = ({ exercise, onComplete, totalExercises, currentExerciseIn
               <p className="text-3xl sm:text-4xl font-bold text-blue-700">{formatTime(timer)}</p>
             </div>
             
-            <Button
-              onClick={() => setIsActive(!isActive)}
-              variant={isActive ? 'danger' : 'primary'}
-              className="w-full text-lg py-3"
-            >
-              {isActive ? 'Pausa' : 'Inizia'}
-            </Button>
+            <div className="flex justify-center">
+              <button
+                onClick={() => setIsActive(!isActive)}
+                className={`w-16 h-16 rounded-full flex items-center justify-center ${isActive ? 'bg-red-500 hover:bg-red-600' : 'bg-blue-500 hover:bg-blue-600'} text-white transition-colors`}
+                aria-label={isActive ? 'Pausa' : 'Inizia'}
+              >
+                {isActive ? <Pause size={28} /> : <Play size={28} className="ml-1" />}
+              </button>
+            </div>
           </div>
         ) : (
           <div className="text-center">
@@ -180,17 +307,57 @@ const ExerciseGuide = ({ exercise, onComplete, totalExercises, currentExerciseIn
               <span className="text-sm font-medium text-gray-500">Modalità Ripetizioni</span>
             </div>
             
-            <div className="flex justify-between items-center mb-6">
-              <div className="bg-blue-100 rounded-full px-4 py-2">
-                <p className="text-sm text-blue-800 font-medium">Serie {currentSet} di {exercise.sets}</p>
+            <div className="flex flex-col items-center mb-6">
+              <div className="h-10 flex items-center justify-center">
+                <div className={`bg-blue-50 rounded-full px-4 py-1.5 transition-all duration-300 ${animateSetChange ? 'bg-blue-100 transform scale-110' : ''}`}>
+                  <p className={`text-sm text-blue-700 font-medium transition-all duration-300 ${animateSetChange ? 'font-bold' : ''}`}>
+                    Serie <span className={`transition-all duration-300 ${animateSetChange ? 'text-blue-800 text-base' : ''}`}>{displayedSet}</span> di {exercise.sets}
+                  </p>
+                </div>
               </div>
               
-              <div className="w-24 h-24 rounded-full bg-blue-100 flex items-center justify-center">
-                <p className="text-3xl font-bold text-blue-700">{exercise.reps}</p>
-              </div>
-              
-              <div className="bg-blue-100 rounded-full px-4 py-2">
-                <p className="text-sm text-blue-800 font-medium">Ripetizioni</p>
+              <div className="relative mb-3 mt-3">
+                <div className="w-32 h-32 rounded-full bg-blue-100 flex items-center justify-center relative overflow-hidden">
+                  {animateSetChange ? (
+                    <>
+                      <div className="absolute inset-0 bg-blue-50 opacity-40 animate-pulse"></div>
+                      <ThumbsUp 
+                        size={48} 
+                        className="text-blue-600 z-10 relative" 
+                        style={{
+                          animation: 'thumb-grow 1.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards'
+                        }}
+                      />
+                      <Particles />
+                      <style>{`
+                        @keyframes thumb-grow {
+                          0% {
+                            transform: scale(0.5);
+                            opacity: 0.5;
+                          }
+                          50% {
+                            transform: scale(1.3);
+                            opacity: 1;
+                          }
+                          75% {
+                            transform: scale(0.9);
+                          }
+                          100% {
+                            transform: scale(1);
+                            opacity: 1;
+                          }
+                        }
+                      `}</style>
+                    </>
+                  ) : (
+                    <p className="text-4xl font-bold text-blue-700">{exercise.reps}</p>
+                  )}
+                </div>
+                {!animateSetChange && (
+                  <span className="absolute -bottom-1 left-1/2 transform -translate-x-1/2 bg-blue-50 text-blue-700 px-3 py-1 rounded-full text-sm font-medium">
+                    Ripetizioni
+                  </span>
+                )}
               </div>
             </div>
             
@@ -198,34 +365,46 @@ const ExerciseGuide = ({ exercise, onComplete, totalExercises, currentExerciseIn
               <div className="space-y-4">
                 <div className="bg-yellow-50 p-4 rounded-lg">
                   <p className="text-xl mb-2 text-yellow-700">Riposo</p>
-                  <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-yellow-100 flex items-center justify-center mx-auto">
-                    <p className="text-2xl sm:text-3xl font-bold text-yellow-700">{formatTime(timer)}</p>
+                  <div className="w-20 h-20 rounded-full bg-yellow-100 flex items-center justify-center mx-auto">
+                    <p className="text-2xl font-bold text-yellow-700">{formatTime(timer)}</p>
                   </div>
                 </div>
-                <Button
-                  onClick={() => {
-                    setIsResting(false)
-                    setTimer(exercise.mode === 'timer' ? exercise.duration : exercise.rest)
-                    if (currentSet < exercise.sets) {
-                      setCurrentSet(prev => prev + 1)
-                    } else {
-                      startTransition()
-                    }
-                  }}
-                  variant="outline"
-                  className="w-full"
-                >
-                  Salta riposo
-                </Button>
+                
+                <div className="flex justify-center">
+                  <button
+                    onClick={handleSkipRest}
+                    className="px-6 py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded-full transition-colors flex items-center gap-2"
+                  >
+                    <SkipForward size={18} />
+                    <span>Salta riposo</span>
+                  </button>
+                </div>
               </div>
             ) : (
-              <Button 
-                onClick={handleSetComplete} 
-                variant="primary" 
-                className="w-full text-lg py-3"
-              >
-                Serie Completata
-              </Button>
+              <div className="flex flex-col items-center gap-4">
+                <div className="flex items-center gap-4">
+                  <div className="flex flex-col items-center">
+                    <button
+                      onClick={handleSetComplete}
+                      className="w-16 h-16 rounded-full bg-green-500 hover:bg-green-600 text-white flex items-center justify-center transition-colors"
+                      aria-label={currentSet < exercise.sets ? 'Completa Serie' : 'Completa Esercizio'}
+                      disabled={animateSetChange}
+                    >
+                      <CheckCircle size={28} />
+                    </button>
+                  </div>
+                </div>
+                
+                {currentSet < exercise.sets && (
+                  <button
+                    onClick={handleSkipSet}
+                    className="px-6 py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded-full transition-colors flex items-center gap-2"
+                  >
+                    <FastForward size={18} />
+                    <span>Salta Serie</span>
+                  </button>
+                )}
+              </div>
             )}
           </div>
         )}
