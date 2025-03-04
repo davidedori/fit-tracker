@@ -367,30 +367,28 @@ const InviteUsers = () => {
                     <td className="px-6 py-4 whitespace-nowrap text-sm">
                       <div className="flex space-x-2">
                         {!invite.is_accepted && (
-                          <>
-                            <button 
-                              onClick={() => copyInviteLink(invite.id, invite.token)}
-                              className="p-1 text-blue-600 hover:text-blue-800 relative"
-                              title="Copia link di invito"
-                            >
-                              {copiedInviteId === invite.id ? <Check size={16} /> : <Share2 size={16} />}
-                              
-                              {/* Tooltip di feedback */}
-                              {copiedInviteId === invite.id && (
-                                <span className="absolute -top-8 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white text-xs rounded py-1 px-2 whitespace-nowrap">
-                                  Link copiato!
-                                </span>
-                              )}
-                            </button>
-                            <button 
-                              onClick={() => setDeletingInvite(invite.id)}
-                              className="p-1 text-red-600 hover:text-red-800"
-                              title="Elimina"
-                            >
-                              <Trash2 size={16} />
-                            </button>
-                          </>
+                          <button 
+                            onClick={() => copyInviteLink(invite.id, invite.token)}
+                            className="p-1 text-blue-600 hover:text-blue-800 relative"
+                            title="Copia link di invito"
+                          >
+                            {copiedInviteId === invite.id ? <Check size={16} /> : <Share2 size={16} />}
+                            
+                            {/* Tooltip di feedback */}
+                            {copiedInviteId === invite.id && (
+                              <span className="absolute -top-8 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white text-xs rounded py-1 px-2 whitespace-nowrap">
+                                Link copiato!
+                              </span>
+                            )}
+                          </button>
                         )}
+                        <button 
+                          onClick={() => setDeletingInvite(invite.id)}
+                          className="p-1 text-red-600 hover:text-red-800"
+                          title="Elimina"
+                        >
+                          <Trash2 size={16} />
+                        </button>
                       </div>
                     </td>
                   </tr>
