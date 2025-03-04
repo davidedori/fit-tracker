@@ -353,11 +353,8 @@ const InviteUsers = () => {
                         </div>
                       )}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                      <div className="flex items-center">
-                        <Mail size={16} className="mr-2 text-gray-400" />
-                        {invite.email}
-                      </div>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {invite.email}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                       {new Date(invite.created_at).toLocaleDateString('it-IT', {

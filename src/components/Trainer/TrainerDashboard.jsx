@@ -393,10 +393,11 @@ const TrainerDashboard = () => {
                           <div className="flex justify-center">
                             <div 
                               onClick={() => navigate(`/trainer/client/${client.id}`)}
-                              className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center cursor-pointer hover:bg-blue-200 transition-colors"
+                              className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center cursor-pointer hover:bg-blue-200 transition-colors relative"
                               title="Gestisci cliente"
                             >
-                              <Clipboard size={16} className="text-blue-600" />
+                              <User size={16} className="text-blue-600" />
+                              <Settings size={16} className="text-blue-600 absolute bottom-0 right-0 bg-white rounded-full p-0.5" />
                             </div>
                           </div>
                         </td>
