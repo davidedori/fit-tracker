@@ -105,44 +105,64 @@ function AuthProvider({ children }) {
     }
   }
 
+  // Funzione per gestire il callback di autenticazione
+  const handleAuthCallback = async () => {
+    try {
+      console.log('🔑 Gestione callback di autenticazione')
+      
+      // Rimuoviamo il parametro error se presente nell'URL
+      const currentHash = window.location.hash
+      const hashWithoutError = currentHash.replace(/&error=[^&]*/, '')
+      if (currentHash !== hashWithoutError) {
+        window.location.hash = hashWithoutError
+        return
+      }
+
+      const hashParams = new URLSearchParams(window.location.hash.substring(window.location.hash.indexOf('?')))
+      const accessToken = hashParams.get('access_token')
+      const refreshToken = hashParams.get('refresh_token')
+      const type = hashParams.get('type')
+
+      console.log('📝 Tipo di callback:', type)
+
+      if (!accessToken || !refreshToken) {
+        console.error('❌ Token mancanti nel callback')
+        window.location.href = `${window.location.origin}${window.location.pathname}#/login`
+        return
+      }
+
+      console.log('🎫 Token trovati, imposto la sessione')
+      const { data: { session }, error } = await supabase.auth.setSession({
+        access_token: accessToken,
+        refresh_token: refreshToken
+      })
+
+      if (error) {
+        console.error('❌ Errore impostazione sessione:', error)
+        window.location.href = `${window.location.origin}${window.location.pathname}#/login`
+        return
+      }
+
+      if (session) {
+        console.log('✅ Sessione impostata correttamente')
+        // Rimuoviamo i parametri dall'URL per evitare loop
+        window.location.hash = '#/'
+        return true
+      }
+
+      return false
+    } catch (e) {
+      console.error('❌ Errore durante la gestione del callback:', e)
+      window.location.href = `${window.location.origin}${window.location.pathname}#/login`
+      return false
+    }
+  }
+
   // Effetto per l'inizializzazione e la gestione degli eventi di autenticazione
   useEffect(() => {
     console.log('🔄 Inizializzazione AuthProvider')
     mountedRef.current = true
     let initTimeoutId = null
-
-    // Funzione per gestire il callback di autenticazione
-    const handleAuthCallback = async () => {
-      try {
-        console.log('🔑 Gestione callback di autenticazione')
-        const hashParams = new URLSearchParams(window.location.hash.substring(window.location.hash.indexOf('?')))
-        const accessToken = hashParams.get('access_token')
-        const refreshToken = hashParams.get('refresh_token')
-
-        if (accessToken && refreshToken) {
-          console.log('🎫 Token trovati, imposto la sessione')
-          const { data: { session }, error } = await supabase.auth.setSession({
-            access_token: accessToken,
-            refresh_token: refreshToken
-          })
-
-          if (error) {
-            console.error('❌ Errore impostazione sessione:', error)
-            window.location.href = `${window.location.origin}${window.location.pathname}#/login`
-            return
-          }
-
-          if (session) {
-            console.log('✅ Sessione impostata correttamente')
-            window.location.href = `${window.location.origin}${window.location.pathname}#/`
-            return
-          }
-        }
-      } catch (e) {
-        console.error('❌ Errore durante la gestione del callback:', e)
-        window.location.href = `${window.location.origin}${window.location.pathname}#/login`
-      }
-    }
 
     const handleAuthStateChange = async (event, session) => {
       console.log('🔔 Evento auth:', event, 'Sessione:', session ? 'presente' : 'assente')
@@ -180,7 +200,13 @@ function AuthProvider({ children }) {
       
       if (isEmailConfirmation) {
         console.log('📧 Rilevato processo di conferma email')
-        await handleAuthCallback()
+        const callbackSuccess = await handleAuthCallback()
+        if (!callbackSuccess) {
+          safeSetState({
+            loading: false,
+            authError: 'Errore durante la conferma email'
+          })
+        }
         return
       }
 
@@ -282,7 +308,13 @@ function AuthProvider({ children }) {
       
       if (isEmailConfirmation) {
         console.log('📧 Inizializzazione con conferma email')
-        await handleAuthCallback()
+        const callbackSuccess = await handleAuthCallback()
+        if (!callbackSuccess) {
+          safeSetState({
+            loading: false,
+            authError: 'Errore durante la conferma email'
+          })
+        }
         return
       }
 
