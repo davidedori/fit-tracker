@@ -31,58 +31,70 @@ const Register = () => {
       setCheckingInvitation(true)
       setError(null)
       
-      // Estrai il token dall'URL
-      const params = new URLSearchParams(location.search)
-      const inviteToken = params.get('token')
-      
-      if (inviteToken) {
-        setToken(inviteToken)
-        try {
-          console.log('Verifica token:', inviteToken)
-          
-          // Verifica il token di invito
-          const { data, error } = await supabase
-            .from('user_invitations')
-            .select('*')
-            .eq('token', inviteToken)
-            .eq('is_accepted', false)
-          
-          if (error) {
-            console.error('Errore nella query dell\'invito:', error)
-            setError('Errore nella verifica dell\'invito: ' + error.message)
-            setCheckingInvitation(false)
-            return
-          }
-          
-          console.log('Risultato query invito:', data)
-          
-          if (data && data.length > 0) {
-            // Verifica se l'invito è scaduto
-            const inviteData = data[0];
-            const isExpired = inviteData.expires_at && new Date(inviteData.expires_at) < new Date();
-            
-            if (isExpired) {
-              console.log('Invito scaduto:', inviteToken);
-              setError('Questo invito è scaduto. Richiedi un nuovo invito.');
-            } else {
-              setIsInvited(true);
-              setInvitedEmail(inviteData.email);
-              setEmail(inviteData.email);
-              // Salva l'ID del trainer che ha inviato l'invito e il ruolo dell'invito
-              setTrainerId(inviteData.invited_by);
-              setInviteRole(inviteData.invite_role || 'user');
-            }
-          } else {
-            console.log('Nessun invito trovato per il token:', inviteToken)
-            setError('Invito non valido o già utilizzato')
-          }
-        } catch (error) {
-          console.error('Errore nella verifica dell\'invito:', error)
-          setError('Si è verificato un errore durante la verifica dell\'invito')
+      try {
+        // Prima di tutto, verifichiamo se c'è una sessione attiva
+        const { data: { session } } = await supabase.auth.getSession()
+        if (session) {
+          console.log('Sessione attiva rilevata, eseguo logout')
+          await supabase.auth.signOut()
         }
-      } else {
-        // Se non c'è un token, verifica se la registrazione è aperta
-        setError('La registrazione è disponibile solo tramite invito')
+
+        // Estrai il token dall'URL
+        const params = new URLSearchParams(location.search)
+        const inviteToken = params.get('token')
+        
+        if (inviteToken) {
+          setToken(inviteToken)
+          try {
+            console.log('Verifica token:', inviteToken)
+            
+            // Verifica il token di invito
+            const { data, error } = await supabase
+              .from('user_invitations')
+              .select('*')
+              .eq('token', inviteToken)
+              .eq('is_accepted', false)
+            
+            if (error) {
+              console.error('Errore nella query dell\'invito:', error)
+              setError('Errore nella verifica dell\'invito: ' + error.message)
+              setCheckingInvitation(false)
+              return
+            }
+            
+            console.log('Risultato query invito:', data)
+            
+            if (data && data.length > 0) {
+              // Verifica se l'invito è scaduto
+              const inviteData = data[0];
+              const isExpired = inviteData.expires_at && new Date(inviteData.expires_at) < new Date();
+              
+              if (isExpired) {
+                console.log('Invito scaduto:', inviteToken);
+                setError('Questo invito è scaduto. Richiedi un nuovo invito.');
+              } else {
+                setIsInvited(true);
+                setInvitedEmail(inviteData.email);
+                setEmail(inviteData.email);
+                // Salva l'ID del trainer che ha inviato l'invito e il ruolo dell'invito
+                setTrainerId(inviteData.invited_by);
+                setInviteRole(inviteData.invite_role || 'user');
+              }
+            } else {
+              console.log('Nessun invito trovato per il token:', inviteToken)
+              setError('Invito non valido o già utilizzato')
+            }
+          } catch (error) {
+            console.error('Errore nella verifica dell\'invito:', error)
+            setError('Si è verificato un errore durante la verifica dell\'invito')
+          }
+        } else {
+          // Se non c'è un token, verifica se la registrazione è aperta
+          setError('La registrazione è disponibile solo tramite invito')
+        }
+      } catch (error) {
+        console.error('Errore nella verifica dell\'invito:', error)
+        setError('Si è verificato un errore durante la verifica dell\'invito')
       }
       
       setCheckingInvitation(false)
@@ -97,6 +109,13 @@ const Register = () => {
     setError(null)
     
     try {
+      // Verifica nuovamente che non ci siano sessioni attive
+      const { data: { session } } = await supabase.auth.getSession()
+      if (session) {
+        console.log('Sessione attiva rilevata durante la registrazione, eseguo logout')
+        await supabase.auth.signOut()
+      }
+
       // Verifica che l'utente sia stato invitato
       if (!isInvited) {
         throw new Error('La registrazione è disponibile solo tramite invito')
