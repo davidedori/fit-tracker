@@ -37,7 +37,8 @@ function AuthProvider({ children }) {
     loading: true,
     isTrainer: false,
     authError: null,
-    initialized: false
+    initialized: false,
+    session: null  // Aggiungiamo lo stato della sessione
   })
   const navigate = useNavigate()
   
@@ -45,7 +46,7 @@ function AuthProvider({ children }) {
   const activeRequests = useRef(new Set())
   const abortController = useRef(new AbortController())
   const mountedRef = useRef(true)
-  const visibilityTimeoutRef = useRef(null)
+  const initializingRef = useRef(false)
   const authStateChangeRef = useRef(null)
 
   console.log('🏗️ AuthProvider renderizzato')
@@ -95,7 +96,7 @@ function AuthProvider({ children }) {
 
       if (error) {
         console.error('❌ Errore recupero profilo:', error)
-        return null
+        throw error
       }
 
       console.log('✅ Profilo recuperato:', data)
@@ -103,7 +104,7 @@ function AuthProvider({ children }) {
     } catch (e) {
       removeActiveRequest(requestId)
       console.error('❌ Errore durante il recupero del profilo:', e)
-      return null
+      throw e
     }
   }
 
@@ -164,6 +165,13 @@ function AuthProvider({ children }) {
   const handleAuthStateChange = async (event, session) => {
     console.log('🔔 Evento auth:', event, 'Sessione:', session ? 'presente' : 'assente')
     
+    // Se stiamo inizializzando, salva solo la sessione
+    if (initializingRef.current) {
+      console.log('🔄 Inizializzazione in corso, salvo solo la sessione')
+      safeSetState({ session })
+      return
+    }
+
     // Previeni chiamate multiple dello stesso evento
     const eventKey = `${event}-${session?.user?.id || 'no-user'}`
     if (authStateChangeRef.current === eventKey) {
@@ -177,9 +185,6 @@ function AuthProvider({ children }) {
       return
     }
 
-    // Annulla eventuali richieste in corso
-    cancelActiveRequests()
-
     try {
       // Reset completo dello stato per SIGNED_OUT
       if (event === 'SIGNED_OUT') {
@@ -192,13 +197,14 @@ function AuthProvider({ children }) {
           user: null,
           isTrainer: false,
           loading: false,
-          authError: null
+          authError: null,
+          session: null
         })
         return
       }
 
-      // Non mostrare il loading per eventi di refresh o initial
-      if (!['REFRESH', 'INITIAL', 'INITIAL_SESSION'].includes(event)) {
+      // Mostra loading solo per eventi che richiedono il profilo
+      if (event === 'SIGNED_IN') {
         safeSetState({ loading: true })
       }
 
@@ -208,7 +214,8 @@ function AuthProvider({ children }) {
           user: null,
           isTrainer: false,
           loading: false,
-          authError: null
+          authError: null,
+          session: null
         })
         return
       }
@@ -220,7 +227,8 @@ function AuthProvider({ children }) {
           user: null,
           isTrainer: false,
           loading: false,
-          authError: null
+          authError: null,
+          session: null
         })
         return
       }
@@ -228,30 +236,35 @@ function AuthProvider({ children }) {
       console.log('👤 Utente trovato:', currentUser.id)
       const safeUser = ensureUserProperties(currentUser)
 
+      // Recupera il profilo
       try {
         let profileData = null
-        const shouldRefreshProfile = event === 'SIGNED_IN' || event === 'REFRESH'
+        const cachedProfile = localStorage.getItem(`profile-${currentUser.id}`)
 
-        if (shouldRefreshProfile) {
-          console.log('🔄 Recupero profilo dal server')
-          profileData = await getProfile(currentUser.id)
-          if (profileData) {
-            localStorage.setItem(`profile-${currentUser.id}`, JSON.stringify(profileData))
+        // Prima prova a usare la cache
+        if (cachedProfile) {
+          try {
+            profileData = JSON.parse(cachedProfile)
+            console.log('📦 Profilo recuperato dalla cache:', profileData)
+          } catch (e) {
+            console.error('❌ Errore parsing cache profilo:', e)
+            localStorage.removeItem(`profile-${currentUser.id}`)
           }
-        } else {
-          // Per altri eventi, usa la cache se disponibile
-          const cachedProfile = localStorage.getItem(`profile-${currentUser.id}`)
-          if (cachedProfile) {
-            try {
-              profileData = JSON.parse(cachedProfile)
-              console.log('📦 Profilo recuperato dalla cache:', profileData)
-            } catch (e) {
-              console.error('❌ Errore parsing cache profilo:', e)
-              localStorage.removeItem(`profile-${currentUser.id}`)
-              profileData = await getProfile(currentUser.id)
-            }
-          } else {
+        }
+
+        // Se non abbiamo dati dalla cache o è un nuovo login, recupera dal server
+        if (!profileData || event === 'SIGNED_IN') {
+          console.log('🔄 Recupero profilo dal server')
+          try {
             profileData = await getProfile(currentUser.id)
+            if (profileData) {
+              localStorage.setItem(`profile-${currentUser.id}`, JSON.stringify(profileData))
+            }
+          } catch (error) {
+            console.error('❌ Errore recupero profilo dal server:', error)
+            if (!profileData) {
+              throw error // Rilancia l'errore solo se non abbiamo dati dalla cache
+            }
           }
         }
 
@@ -271,7 +284,8 @@ function AuthProvider({ children }) {
             user: safeUser,
             isTrainer: isTrainerOrAdmin,
             loading: false,
-            authError: null
+            authError: null,
+            session
           })
         } else {
           console.log('⚠️ Profilo non trovato, uso solo dati base utente')
@@ -279,22 +293,21 @@ function AuthProvider({ children }) {
             user: safeUser,
             isTrainer: false,
             loading: false,
-            authError: null
+            authError: null,
+            session
           })
         }
       } catch (e) {
         console.error('❌ Errore gestione profilo:', e)
-        if (mountedRef.current) {
-          safeSetState({
-            user: safeUser,
-            isTrainer: false,
-            loading: false,
-            authError: e.message
-          })
-        }
+        safeSetState({
+          user: safeUser,
+          isTrainer: false,
+          loading: false,
+          authError: e.message,
+          session
+        })
       }
     } finally {
-      // Reset del riferimento all'evento corrente
       authStateChangeRef.current = null
     }
   }
@@ -317,30 +330,13 @@ function AuthProvider({ children }) {
     }
   }
 
-  // Effetto per l'inizializzazione e la gestione degli eventi di autenticazione
+  // Effetto per l'inizializzazione
   useEffect(() => {
     console.log('🔄 Inizializzazione AuthProvider')
     mountedRef.current = true
+    initializingRef.current = true
 
-    // Aggiungi listener per il cambio di visibilità
-    document.addEventListener('visibilitychange', handleVisibilityChange)
-
-    // Inizializzazione
     const init = async () => {
-      const isEmailConfirmation = window.location.hash.includes('#/auth/callback')
-      
-      if (isEmailConfirmation) {
-        console.log('📧 Inizializzazione con conferma email')
-        const callbackSuccess = await handleAuthCallback()
-        if (!callbackSuccess) {
-          safeSetState({
-            loading: false,
-            authError: 'Errore durante la conferma email'
-          })
-        }
-        return
-      }
-
       try {
         console.log('🚀 Avvio inizializzazione')
         const { data: { session }, error } = await supabase.auth.getSession()
@@ -354,18 +350,27 @@ function AuthProvider({ children }) {
           return
         }
 
-        if (mountedRef.current) {
+        // Salva la sessione iniziale
+        safeSetState({ session })
+        
+        // Procedi con l'inizializzazione completa
+        initializingRef.current = false
+        if (session) {
           await handleAuthStateChange('INITIAL', session)
-          safeSetState(prev => ({ ...prev, initialized: true }))
+        } else {
+          safeSetState({
+            loading: false,
+            initialized: true
+          })
         }
       } catch (e) {
         console.error('❌ Errore inizializzazione:', e)
-        if (mountedRef.current) {
-          safeSetState({
-            authError: e.message,
-            loading: false
-          })
-        }
+        safeSetState({
+          authError: e.message,
+          loading: false
+        })
+      } finally {
+        initializingRef.current = false
       }
     }
 
@@ -376,10 +381,6 @@ function AuthProvider({ children }) {
 
     return () => {
       console.log('🧹 Pulizia AuthProvider')
-      document.removeEventListener('visibilitychange', handleVisibilityChange)
-      if (visibilityTimeoutRef.current) {
-        clearTimeout(visibilityTimeoutRef.current)
-      }
       mountedRef.current = false
       cancelActiveRequests()
       subscription.unsubscribe()
