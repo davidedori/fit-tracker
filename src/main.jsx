@@ -4,12 +4,10 @@ import { HashRouter as Router } from 'react-router-dom'
 import App from './App'
 import './index.css'
 
-// Usa sempre /fit-tracker/ come base path
-const BASE_PATH = '/fit-tracker'
-
-// Funzione globale per ottenere il base URL completo
+// Configura il base URL per supportare sia sviluppo che produzione
 window.getBaseUrl = () => {
-  return `${window.location.origin}${BASE_PATH}`;
+  const isDevelopment = import.meta.env.DEV;
+  return isDevelopment ? window.location.origin : `${window.location.origin}/fit-tracker`;
 };
 
 // Intercetta e gestisci tutti gli errori relativi a photoURL

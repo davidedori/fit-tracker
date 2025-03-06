@@ -2,9 +2,10 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import path from 'path'
 
-export default defineConfig({
+// https://vitejs.dev/config/
+export default defineConfig(({ command }) => ({
   plugins: [react()],
-  base: '/fit-tracker/',
+  base: command === 'serve' ? '' : '/fit-tracker/',
   build: {
     outDir: 'dist',
     assetsDir: 'assets',
@@ -20,6 +21,7 @@ export default defineConfig({
     }
   },
   server: {
-    base: '/fit-tracker/'
+    port: 3000,
+    open: true
   }
-}) 
+})) 

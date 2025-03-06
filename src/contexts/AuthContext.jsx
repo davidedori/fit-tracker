@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react'
+import React, { createContext, useContext, useState, useEffect, useRef, useMemo } from 'react'
 import { supabase } from '../services/supabase'
 import { useNavigate } from 'react-router-dom'
 
@@ -32,82 +32,328 @@ function useAuth() {
 
 // Esporta AuthProvider come funzione nominata
 function AuthProvider({ children }) {
-  const [user, setUser] = useState(null)
-  const [loading, setLoading] = useState(true)
-  const [isTrainer, setIsTrainer] = useState(false)
-  const [authError, setAuthError] = useState(null)
+  const [authState, setAuthState] = useState({
+    user: null,
+    loading: true,
+    isTrainer: false,
+    authError: null,
+    initialized: false
+  })
   const navigate = useNavigate()
+  
+  // Ref per tenere traccia delle richieste in corso e dello stato del componente
+  const activeRequests = useRef(new Set())
+  const abortController = useRef(new AbortController())
+  const mountedRef = useRef(true)
 
-  console.log('AuthProvider inizializzato')
+  console.log('🏗️ AuthProvider renderizzato')
+
+  // Funzione per aggiornare lo stato in modo sicuro
+  const safeSetState = (updates) => {
+    if (mountedRef.current) {
+      setAuthState(prev => ({ ...prev, ...updates }))
+    }
+  }
+
+  // Funzione per annullare tutte le richieste attive
+  const cancelActiveRequests = () => {
+    if (activeRequests.current.size > 0) {
+      console.log('🚫 Annullamento richieste attive:', activeRequests.current.size)
+      abortController.current.abort()
+      abortController.current = new AbortController()
+      activeRequests.current.clear()
+    }
+  }
+
+  // Funzione per aggiungere una richiesta attiva
+  const addActiveRequest = (requestId) => {
+    console.log('➕ Aggiunta richiesta:', requestId)
+    activeRequests.current.add(requestId)
+  }
+
+  // Funzione per rimuovere una richiesta attiva
+  const removeActiveRequest = (requestId) => {
+    console.log('➖ Rimozione richiesta:', requestId)
+    activeRequests.current.delete(requestId)
+  }
+
+  // Funzione per recuperare il profilo con RPC
+  const getProfile = async (userId) => {
+    const requestId = `profile-${userId}-${Date.now()}`
+    addActiveRequest(requestId)
+
+    try {
+      console.log('📊 Recupero profilo tramite RPC per:', userId)
+      
+      const { data, error } = await supabase
+        .rpc('get_user_profile', { user_id: userId })
+        .single()
+
+      removeActiveRequest(requestId)
+
+      if (error) {
+        console.error('❌ Errore recupero profilo:', error)
+        return null
+      }
+
+      console.log('✅ Profilo recuperato:', data)
+      return data
+    } catch (e) {
+      removeActiveRequest(requestId)
+      console.error('❌ Errore durante il recupero del profilo:', e)
+      return null
+    }
+  }
+
+  // Effetto per l'inizializzazione e la gestione degli eventi di autenticazione
+  useEffect(() => {
+    console.log('🔄 Inizializzazione AuthProvider')
+    mountedRef.current = true
+    let initTimeoutId = null
+
+    const handleAuthStateChange = async (event, session) => {
+      console.log('🔔 Evento auth:', event, 'Sessione:', session ? 'presente' : 'assente')
+      
+      if (!mountedRef.current) {
+        console.log('❌ Componente smontato, ignoro evento auth')
+        return
+      }
+
+      // Annulla eventuali richieste in corso
+      cancelActiveRequests()
+
+      // Impostiamo subito loading a true per mostrare il caricamento
+      safeSetState({ loading: true })
+
+      if (!session) {
+        console.log('⚠️ Nessuna sessione, reset stato')
+        safeSetState({
+          user: null,
+          isTrainer: false,
+          loading: false,
+          authError: null
+        })
+        return
+      }
+
+      const currentUser = session.user
+      if (!currentUser) {
+        console.log('⚠️ Nessun utente nella sessione')
+        safeSetState({
+          user: null,
+          isTrainer: false,
+          loading: false,
+          authError: null
+        })
+        return
+      }
+
+      console.log('👤 Utente trovato:', currentUser.id)
+      const safeUser = ensureUserProperties(currentUser)
+
+      try {
+        // Proviamo prima a recuperare il profilo dalla cache del localStorage
+        const cachedProfile = localStorage.getItem(`profile-${currentUser.id}`)
+        let profileData = null
+
+        if (cachedProfile) {
+          try {
+            profileData = JSON.parse(cachedProfile)
+            console.log('📦 Profilo recuperato dalla cache:', profileData)
+          } catch (e) {
+            console.error('❌ Errore parsing cache profilo:', e)
+            localStorage.removeItem(`profile-${currentUser.id}`)
+          }
+        }
+
+        // Se non abbiamo il profilo in cache o è scaduto, lo recuperiamo dal server
+        if (!profileData) {
+          profileData = await getProfile(currentUser.id)
+          if (profileData) {
+            // Salviamo il profilo in cache
+            localStorage.setItem(`profile-${currentUser.id}`, JSON.stringify(profileData))
+          }
+        }
+        
+        if (!mountedRef.current) {
+          console.log('❌ Componente smontato durante il recupero del profilo')
+          return
+        }
+
+        if (profileData) {
+          safeUser.nome = profileData.nome
+          safeUser.cognome = profileData.cognome
+          
+          const isTrainerOrAdmin = profileData.role === 'trainer' || profileData.role === 'admin'
+          console.log('👑 Stato trainer:', isTrainerOrAdmin)
+          
+          safeSetState({
+            user: safeUser,
+            isTrainer: isTrainerOrAdmin,
+            loading: false,
+            authError: null
+          })
+        } else {
+          // Se non abbiamo il profilo, settiamo comunque l'utente base
+          console.log('⚠️ Profilo non trovato, uso solo dati base utente')
+          safeSetState({
+            user: safeUser,
+            isTrainer: false,
+            loading: false,
+            authError: null
+          })
+        }
+      } catch (e) {
+        console.error('❌ Errore gestione profilo:', e)
+        if (mountedRef.current) {
+          // In caso di errore, proviamo a usare i dati in cache se disponibili
+          const cachedProfile = localStorage.getItem(`profile-${currentUser.id}`)
+          if (cachedProfile) {
+            try {
+              const profileData = JSON.parse(cachedProfile)
+              console.log('🔄 Uso dati profilo dalla cache dopo errore:', profileData)
+              safeUser.nome = profileData.nome
+              safeUser.cognome = profileData.cognome
+              safeSetState({
+                user: safeUser,
+                isTrainer: profileData.role === 'trainer' || profileData.role === 'admin',
+                loading: false,
+                authError: null
+              })
+              return
+            } catch (e) {
+              console.error('❌ Errore parsing cache profilo dopo errore:', e)
+            }
+          }
+          
+          // Se non abbiamo dati in cache, settiamo l'utente base
+          safeSetState({
+            user: safeUser,
+            isTrainer: false,
+            loading: false,
+            authError: e.message
+          })
+        }
+      }
+    }
+
+    // Inizializzazione con gestione timeout
+    const init = async () => {
+      // Usiamo più timeout brevi invece di uno lungo
+      const startTimeout = () => {
+        if (initTimeoutId) clearTimeout(initTimeoutId)
+        initTimeoutId = setTimeout(() => {
+          if (mountedRef.current && authState.loading) {
+            console.log('⏰ Timeout parziale, riprovo...')
+            startTimeout()
+          }
+        }, 800)
+      }
+
+      startTimeout()
+
+      try {
+        console.log('🚀 Avvio inizializzazione')
+        const { data: { session }, error } = await supabase.auth.getSession()
+        
+        if (error) {
+          console.error('❌ Errore getSession:', error)
+          if (mountedRef.current) {
+            safeSetState({
+              authError: error.message,
+              loading: false
+            })
+          }
+          return
+        }
+
+        if (mountedRef.current) {
+          await handleAuthStateChange('INITIAL', session)
+          safeSetState(prev => ({ ...prev, initialized: true }))
+        }
+      } catch (e) {
+        console.error('❌ Errore inizializzazione:', e)
+        if (mountedRef.current) {
+          safeSetState({
+            authError: e.message,
+            loading: false
+          })
+        }
+      } finally {
+        if (initTimeoutId) {
+          clearTimeout(initTimeoutId)
+        }
+      }
+    }
+
+    init()
+
+    // Sottoscrizione agli eventi di auth
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(handleAuthStateChange)
+
+    return () => {
+      console.log('🧹 Pulizia AuthProvider')
+      if (initTimeoutId) {
+        clearTimeout(initTimeoutId)
+      }
+      mountedRef.current = false
+      cancelActiveRequests()
+      subscription.unsubscribe()
+    }
+  }, [])
 
   const signOut = async () => {
     try {
-      console.log('Tentativo di logout completo...')
+      console.log('🚪 Tentativo di logout completo...')
       
-      // Resetta lo stato dell'applicazione
-      setUser(null)
-      setIsTrainer(false)
-      
-      // Rimuovi tutti i dati di Supabase dal localStorage
-      for (let i = 0; i < localStorage.length; i++) {
-        const key = localStorage.key(i)
-        if (key && key.startsWith('sb-')) {
-          console.log(`Rimozione chiave localStorage: ${key}`)
-          localStorage.removeItem(key)
-          // Decrementa i perché abbiamo rimosso un elemento
-          i--
-        }
-      }
-      
-      // Tenta il logout standard da Supabase
+      // Prima facciamo il logout da Supabase
       try {
         await supabase.auth.signOut()
-        console.log('Logout da Supabase completato')
+        console.log('✅ Logout da Supabase completato')
       } catch (error) {
-        console.error('Errore durante il logout da Supabase:', error)
+        console.error('❌ Errore durante il logout da Supabase:', error)
       }
       
-      // Forza un reload della pagina per assicurarsi che tutto sia resettato
-      console.log('Reindirizzamento al login...')
-      navigate('/#/login', { replace: true })
+      // Poi resettiamo lo stato dell'applicazione
+      safeSetState({
+        user: null,
+        isTrainer: false
+      })
       
-      // Forza un reload completo dopo un breve ritardo
-      setTimeout(() => {
-        console.log('Ricaricamento completo della pagina')
-        window.location.reload()
-      }, 100)
-      
-    } catch (error) {
-      console.error('Errore generale durante il logout:', error)
-      
-      // Anche in caso di errore, resettiamo tutto
-      setUser(null)
-      setIsTrainer(false)
-      
-      // Rimuovi tutti i dati di Supabase dal localStorage
-      for (let i = 0; i < localStorage.length; i++) {
-        const key = localStorage.key(i)
-        if (key && key.startsWith('sb-')) {
+      // Rimuoviamo i dati dal localStorage
+      Object.keys(localStorage)
+        .filter(key => key.startsWith('sb-'))
+        .forEach(key => {
+          console.log(`🗑️ Rimozione chiave localStorage: ${key}`)
           localStorage.removeItem(key)
-          i--
-        }
-      }
+        })
       
-      // Forza un reload della pagina
-      window.location.href = window.getBaseUrl() + '/#/login'
+      // Navighiamo al login
+      window.location.href = `${window.location.origin}${window.location.pathname}#/login`
+    } catch (error) {
+      console.error('❌ Errore generale durante il logout:', error)
+      // In caso di errore, forziamo comunque il logout
+      window.location.href = `${window.location.origin}${window.location.pathname}#/login`
     }
   }
 
   // Funzione per verificare se l'utente è un trainer
-  const checkUserRole = async (userId) => {
+  const checkUserRole = async (userId, existingProfileData = null) => {
     console.log('Verifica ruolo per userId:', userId)
     if (!userId) {
       console.log('UserId non fornito, ritorno false')
       return false
     }
-    
+
     try {
-      // Verifica se l'utente ha il ruolo 'trainer' o 'admin' nella tabella user_profiles
+      // Se abbiamo già i dati del profilo, usiamo quelli
+      if (existingProfileData) {
+        const isTrainerOrAdmin = existingProfileData.role === 'trainer' || existingProfileData.role === 'admin'
+        console.log('Ruolo utente (da dati esistenti):', existingProfileData.role, 'isTrainerOrAdmin =', isTrainerOrAdmin)
+        return isTrainerOrAdmin
+      }
+
+      // Altrimenti, facciamo la query
       const { data, error } = await supabase
         .from('user_profiles')
         .select('role')
@@ -116,159 +362,36 @@ function AuthProvider({ children }) {
       
       if (error) {
         console.error('Errore nella verifica del ruolo:', error)
-        // Fallback per l'admin
-        const isAdmin = userId === '2248ebaf-92e7-423d-907e-a8a7532e52d9'
-        console.log('Fallback: imposto manualmente isTrainer =', isAdmin)
-        return isAdmin
+        return false
       }
       
-      const isTrainerOrAdmin = data.role === 'trainer' || data.role === 'admin'
-      console.log('Ruolo utente:', data.role, 'isTrainerOrAdmin =', isTrainerOrAdmin)
+      const isTrainerOrAdmin = data?.role === 'trainer' || data?.role === 'admin'
+      console.log('Ruolo utente:', data?.role, 'isTrainerOrAdmin =', isTrainerOrAdmin)
       return isTrainerOrAdmin
     } catch (e) {
       console.error('Eccezione nella verifica del ruolo:', e)
-      // Fallback per l'admin
-      const isAdmin = userId === '2248ebaf-92e7-423d-907e-a8a7532e52d9'
-      console.log('Fallback in eccezione: imposto manualmente isTrainer =', isAdmin)
-      return isAdmin
+      return false
     }
   }
 
-  useEffect(() => {
-    console.log('useEffect in AuthProvider')
-    let isMounted = true;
-    
-    const initAuth = async () => {
-      try {
-        console.log('Inizializzazione autenticazione')
-        const { data: sessionData, error: sessionError } = await supabase.auth.getSession()
-        
-        if (sessionError) {
-          console.error('Errore getSession:', sessionError)
-          if (isMounted) {
-            setAuthError(sessionError.message)
-            setLoading(false)
-          }
-          return
-        }
-        
-        const session = sessionData.session
-        const currentUser = session?.user ?? null
-        console.log('Utente corrente:', currentUser ? `ID: ${currentUser.id}` : 'Nessuno')
-        
-        // Usa la funzione locale invece di window.ensureUserProperties
-        const safeUser = ensureUserProperties(currentUser);
-        
-        if (isMounted) {
-          setUser(safeUser)
-        }
-        
-        if (safeUser && isMounted) {
-          console.log('Verifica ruolo trainer per utente corrente')
-          try {
-            // Ottieni i dati del profilo utente
-            const { data: profileData, error: profileError } = await supabase
-              .from('user_profiles')
-              .select('role, nome, cognome')
-              .eq('id', safeUser.id)
-              .single()
-            
-            if (profileError) {
-              console.error('Errore nel recupero del profilo:', profileError)
-            } else if (profileData) {
-              // Aggiungi nome e cognome all'oggetto utente
-              safeUser.nome = profileData.nome
-              safeUser.cognome = profileData.cognome
-            }
-            
-            const trainerStatus = await checkUserRole(safeUser.id)
-            console.log('Stato trainer:', trainerStatus)
-            if (isMounted) {
-              setIsTrainer(trainerStatus)
-            }
-          } catch (e) {
-            console.error('Errore durante la verifica del ruolo trainer:', e)
-            if (isMounted) {
-              setAuthError(e.message)
-              // Fallback
-              const isAdmin = safeUser.id === '2248ebaf-92e7-423d-907e-a8a7532e52d9'
-              console.log('Fallback in getSession: imposto manualmente isTrainer =', isAdmin)
-              setIsTrainer(isAdmin)
-            }
-          }
-        }
-        
-        if (isMounted) {
-          setLoading(false)
-          console.log('AuthProvider caricamento completato')
-        }
-      } catch (e) {
-        console.error('Errore generale in initAuth:', e)
-        if (isMounted) {
-          setAuthError(e.message)
-          setLoading(false)
-        }
-      }
-    }
-    
-    initAuth();
-    
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      console.log('Cambio stato autenticazione:', _event)
-      const currentUser = session?.user ?? null
-      console.log('Nuovo utente:', currentUser ? `ID: ${currentUser.id}` : 'Nessuno')
-      
-      // Usa la funzione locale invece di window.ensureUserProperties
-      const safeUser = ensureUserProperties(currentUser);
-      
-      if (isMounted) {
-        setUser(safeUser)
-      }
-      
-      if (safeUser && isMounted) {
-        try {
-          const trainerStatus = await checkUserRole(safeUser.id)
-          console.log('Nuovo stato trainer:', trainerStatus)
-          if (isMounted) {
-            setIsTrainer(trainerStatus)
-          }
-        } catch (e) {
-          console.error('Errore durante la verifica del nuovo ruolo trainer:', e)
-          if (isMounted) {
-            setAuthError(e.message)
-            // Fallback
-            const isAdmin = safeUser.id === '2248ebaf-92e7-423d-907e-a8a7532e52d9'
-            console.log('Fallback in onAuthStateChange: imposto manualmente isTrainer =', isAdmin)
-            setIsTrainer(isAdmin)
-          }
-        }
-      } else if (isMounted) {
-        setIsTrainer(false)
-      }
-    })
-
-    return () => {
-      console.log('Pulizia AuthProvider')
-      isMounted = false;
-      subscription.unsubscribe()
-    }
-  }, [])
+  // Memorizziamo il valore del context per evitare re-render non necessari
+  const contextValue = useMemo(() => ({
+    user: authState.user,
+    loading: authState.loading,
+    signOut,
+    isTrainer: authState.isTrainer,
+    authError: authState.authError
+  }), [authState])
 
   return (
-    <AuthContext.Provider value={{ 
-      user, 
-      loading, 
-      signOut, 
-      isTrainer, 
-      authError 
-    }}>
-      {loading ? (
+    <AuthContext.Provider value={contextValue}>
+      {authState.loading ? (
         <div className="flex justify-center items-center h-screen">
           <div className="text-center">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
             <p className="text-gray-600">Caricamento...</p>
-            {authError && (
-              <p className="text-red-500 mt-2">Errore: {authError}</p>
+            {authState.authError && (
+              <p className="text-red-500 mt-2">Errore: {authState.authError}</p>
             )}
           </div>
         </div>
