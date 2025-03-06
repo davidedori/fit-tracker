@@ -38,16 +38,17 @@ function AuthProvider({ children }) {
     isTrainer: false,
     authError: null,
     initialized: false,
-    session: null  // Aggiungiamo lo stato della sessione
+    session: null
   })
   const navigate = useNavigate()
   
-  // Refs
   const activeRequests = useRef(new Set())
   const abortController = useRef(new AbortController())
   const mountedRef = useRef(true)
   const initializingRef = useRef(false)
   const authStateChangeRef = useRef(null)
+  const lastEventRef = useRef(null)
+  const initialSessionRef = useRef(null)
 
   console.log('🏗️ AuthProvider renderizzato')
 
@@ -165,6 +166,21 @@ function AuthProvider({ children }) {
   const handleAuthStateChange = async (event, session) => {
     console.log('🔔 Evento auth:', event, 'Sessione:', session ? 'presente' : 'assente')
     
+    // Se la sessione è identica a quella iniziale e non è un evento iniziale o di logout, ignora
+    if (initialSessionRef.current?.user?.id === session?.user?.id && 
+        !['INITIAL', 'SIGNED_OUT'].includes(event)) {
+      console.log('🔄 Sessione identica a quella iniziale e non è un evento iniziale, ignoro')
+      return
+    }
+
+    // Ignora eventi duplicati o non necessari
+    const eventKey = `${event}-${session?.user?.id || 'no-user'}`
+    if (lastEventRef.current === eventKey && event !== 'INITIAL') {
+      console.log('🔄 Evento duplicato, ignoro')
+      return
+    }
+    lastEventRef.current = eventKey
+
     // Se stiamo inizializzando, salva solo la sessione
     if (initializingRef.current) {
       console.log('🔄 Inizializzazione in corso, salvo solo la sessione')
@@ -172,13 +188,11 @@ function AuthProvider({ children }) {
       return
     }
 
-    // Previeni chiamate multiple dello stesso evento
-    const eventKey = `${event}-${session?.user?.id || 'no-user'}`
-    if (authStateChangeRef.current === eventKey) {
-      console.log('🔄 Evento già in elaborazione, skip')
+    // Ignora eventi non rilevanti
+    if (!['SIGNED_IN', 'SIGNED_OUT', 'INITIAL', 'INITIAL_SESSION'].includes(event)) {
+      console.log('🔄 Evento non rilevante, ignoro:', event)
       return
     }
-    authStateChangeRef.current = eventKey
 
     if (!mountedRef.current) {
       console.log('❌ Componente smontato, ignoro evento auth')
@@ -203,8 +217,8 @@ function AuthProvider({ children }) {
         return
       }
 
-      // Mostra loading solo per eventi che richiedono il profilo
-      if (event === 'SIGNED_IN') {
+      // Mostra loading solo per eventi che richiedono il profilo e non è un evento iniziale con profilo in cache
+      if (event === 'SIGNED_IN' || (event === 'INITIAL' && !localStorage.getItem(`profile-${session?.user?.id}`))) {
         safeSetState({ loading: true })
       }
 
@@ -337,6 +351,7 @@ function AuthProvider({ children }) {
         }
 
         // Salva la sessione iniziale
+        initialSessionRef.current = session
         safeSetState({ session })
         
         // Procedi con l'inizializzazione completa
@@ -376,6 +391,7 @@ function AuthProvider({ children }) {
       mountedRef.current = false
       cancelActiveRequests()
       subscription.unsubscribe()
+      initialSessionRef.current = null
     }
   }, [])
 
