@@ -41,7 +41,7 @@ function AuthProvider({ children }) {
     session: null
   })
   const navigate = useNavigate()
-  
+
   const activeRequests = useRef(new Set())
   const abortController = useRef(new AbortController())
   const mountedRef = useRef(true)
@@ -437,7 +437,7 @@ function AuthProvider({ children }) {
       console.log('UserId non fornito, ritorno false')
       return false
     }
-
+    
     try {
       // Se abbiamo già i dati del profilo, usiamo quelli
       if (existingProfileData) {
