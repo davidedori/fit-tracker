@@ -125,6 +125,18 @@ function AuthProvider({ children }) {
       // Impostiamo subito loading a true per mostrare il caricamento
       safeSetState({ loading: true })
 
+      // Gestione speciale per il processo di conferma email
+      const isEmailConfirmation = window.location.hash.includes('#/auth/callback')
+      if (isEmailConfirmation) {
+        console.log('📧 Processo di conferma email in corso')
+        // Se siamo nel processo di conferma email e non abbiamo ancora una sessione,
+        // manteniamo lo stato di loading
+        if (!session && event !== 'SIGNED_IN') {
+          console.log('⏳ Attendo completamento conferma email...')
+          return
+        }
+      }
+
       if (!session) {
         console.log('⚠️ Nessuna sessione, reset stato')
         safeSetState({
@@ -133,6 +145,13 @@ function AuthProvider({ children }) {
           loading: false,
           authError: null
         })
+
+        // Se siamo nella pagina di callback ma non abbiamo sessione dopo un SIGNED_IN,
+        // probabilmente c'è stato un errore
+        if (isEmailConfirmation && event === 'SIGNED_IN') {
+          console.log('❌ Errore durante la conferma email, reindirizzo al login')
+          window.location.href = `${window.location.origin}${window.location.pathname}#/login`
+        }
         return
       }
 
@@ -152,6 +171,12 @@ function AuthProvider({ children }) {
       const safeUser = ensureUserProperties(currentUser)
 
       try {
+        // Se siamo nel processo di conferma email, aspettiamo un po' prima di recuperare il profilo
+        if (isEmailConfirmation) {
+          console.log('⏳ Attendo conferma email prima di recuperare il profilo...')
+          await new Promise(resolve => setTimeout(resolve, 1000))
+        }
+
         // Proviamo prima a recuperare il profilo dalla cache del localStorage
         const cachedProfile = localStorage.getItem(`profile-${currentUser.id}`)
         let profileData = null
@@ -193,6 +218,12 @@ function AuthProvider({ children }) {
             loading: false,
             authError: null
           })
+
+          // Se siamo nel processo di conferma email, reindirizza alla home dopo il successo
+          if (isEmailConfirmation) {
+            console.log('✅ Conferma email completata, reindirizzo alla home')
+            window.location.href = `${window.location.origin}${window.location.pathname}#/`
+          }
         } else {
           // Se non abbiamo il profilo, settiamo comunque l'utente base
           console.log('⚠️ Profilo non trovato, uso solo dati base utente')
@@ -202,6 +233,12 @@ function AuthProvider({ children }) {
             loading: false,
             authError: null
           })
+
+          // Se siamo nel processo di conferma email, reindirizza comunque alla home
+          if (isEmailConfirmation) {
+            console.log('✅ Conferma email completata (senza profilo), reindirizzo alla home')
+            window.location.href = `${window.location.origin}${window.location.pathname}#/`
+          }
         }
       } catch (e) {
         console.error('❌ Errore gestione profilo:', e)
@@ -220,6 +257,12 @@ function AuthProvider({ children }) {
                 loading: false,
                 authError: null
               })
+
+              // Se siamo nel processo di conferma email, reindirizza alla home
+              if (isEmailConfirmation) {
+                console.log('✅ Conferma email completata (usando cache), reindirizzo alla home')
+                window.location.href = `${window.location.origin}${window.location.pathname}#/`
+              }
               return
             } catch (e) {
               console.error('❌ Errore parsing cache profilo dopo errore:', e)
@@ -233,6 +276,12 @@ function AuthProvider({ children }) {
             loading: false,
             authError: e.message
           })
+
+          // Se siamo nel processo di conferma email, reindirizza comunque alla home
+          if (isEmailConfirmation) {
+            console.log('✅ Conferma email completata (con errori), reindirizzo alla home')
+            window.location.href = `${window.location.origin}${window.location.pathname}#/`
+          }
         }
       }
     }
