@@ -45,6 +45,7 @@ function AuthProvider({ children }) {
   const activeRequests = useRef(new Set())
   const abortController = useRef(new AbortController())
   const mountedRef = useRef(true)
+  const visibilityTimeoutRef = useRef(null)
 
   console.log('🏗️ AuthProvider renderizzato')
 
@@ -158,10 +159,61 @@ function AuthProvider({ children }) {
     }
   }
 
+  // Funzione per recuperare lo stato corrente
+  const refreshAuthState = async () => {
+    console.log('🔄 Aggiornamento stato autenticazione')
+    try {
+      const { data: { session }, error } = await supabase.auth.getSession()
+      
+      if (error) {
+        console.error('❌ Errore refresh sessione:', error)
+        return
+      }
+
+      if (!session) {
+        console.log('⚠️ Nessuna sessione attiva')
+        safeSetState({
+          user: null,
+          isTrainer: false,
+          loading: false,
+          authError: null
+        })
+        return
+      }
+
+      // Gestisci lo stato con la sessione esistente
+      await handleAuthStateChange('REFRESH', session)
+    } catch (e) {
+      console.error('❌ Errore durante il refresh dello stato:', e)
+    }
+  }
+
+  // Gestore della visibilità del documento
+  const handleVisibilityChange = () => {
+    if (document.visibilityState === 'visible') {
+      console.log('👁️ Documento tornato visibile')
+      // Annulla eventuali timeout precedenti
+      if (visibilityTimeoutRef.current) {
+        clearTimeout(visibilityTimeoutRef.current)
+      }
+      
+      // Aspetta un breve momento prima di refreshare lo stato
+      visibilityTimeoutRef.current = setTimeout(() => {
+        if (mountedRef.current) {
+          refreshAuthState()
+        }
+      }, 300)
+    }
+  }
+
   // Effetto per l'inizializzazione e la gestione degli eventi di autenticazione
   useEffect(() => {
     console.log('🔄 Inizializzazione AuthProvider')
     mountedRef.current = true
+
+    // Aggiungi listener per il cambio di visibilità
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+
     let initTimeoutId = null
 
     const handleAuthStateChange = async (event, session) => {
@@ -192,8 +244,10 @@ function AuthProvider({ children }) {
         return
       }
 
-      // Impostiamo subito loading a true per mostrare il caricamento
-      safeSetState({ loading: true })
+      // Non mostrare il loading per eventi di refresh
+      if (event !== 'REFRESH') {
+        safeSetState({ loading: true })
+      }
 
       // Gestione speciale per il processo di conferma email
       const isEmailConfirmation = window.location.hash.includes('#/auth/callback')
@@ -372,8 +426,9 @@ function AuthProvider({ children }) {
 
     return () => {
       console.log('🧹 Pulizia AuthProvider')
-      if (initTimeoutId) {
-        clearTimeout(initTimeoutId)
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+      if (visibilityTimeoutRef.current) {
+        clearTimeout(visibilityTimeoutRef.current)
       }
       mountedRef.current = false
       cancelActiveRequests()
