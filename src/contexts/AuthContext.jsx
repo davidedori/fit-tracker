@@ -155,6 +155,23 @@ function AuthProvider({ children }) {
       // Annulla eventuali richieste in corso
       cancelActiveRequests()
 
+      // Reset completo dello stato per SIGNED_OUT
+      if (event === 'SIGNED_OUT') {
+        console.log('🚪 Reset completo stato per logout')
+        // Pulizia cache
+        Object.keys(localStorage)
+          .filter(key => key.startsWith('profile-'))
+          .forEach(key => localStorage.removeItem(key))
+        
+        safeSetState({
+          user: null,
+          isTrainer: false,
+          loading: false,
+          authError: null
+        })
+        return
+      }
+
       // Impostiamo subito loading a true per mostrare il caricamento
       safeSetState({ loading: true })
 
@@ -194,29 +211,31 @@ function AuthProvider({ children }) {
       const safeUser = ensureUserProperties(currentUser)
 
       try {
-        // Proviamo prima a recuperare il profilo dalla cache del localStorage
-        const cachedProfile = localStorage.getItem(`profile-${currentUser.id}`)
+        // Per SIGNED_IN, forziamo sempre il recupero del profilo dal server
         let profileData = null
-
-        if (cachedProfile) {
-          try {
-            profileData = JSON.parse(cachedProfile)
-            console.log('📦 Profilo recuperato dalla cache:', profileData)
-          } catch (e) {
-            console.error('❌ Errore parsing cache profilo:', e)
-            localStorage.removeItem(`profile-${currentUser.id}`)
-          }
-        }
-
-        // Se non abbiamo il profilo in cache o è scaduto, lo recuperiamo dal server
-        if (!profileData) {
+        if (event === 'SIGNED_IN') {
+          console.log('🔄 Nuovo login, recupero profilo dal server')
           profileData = await getProfile(currentUser.id)
           if (profileData) {
-            // Salviamo il profilo in cache
             localStorage.setItem(`profile-${currentUser.id}`, JSON.stringify(profileData))
           }
+        } else {
+          // Per altri eventi, proviamo prima la cache
+          const cachedProfile = localStorage.getItem(`profile-${currentUser.id}`)
+          if (cachedProfile) {
+            try {
+              profileData = JSON.parse(cachedProfile)
+              console.log('📦 Profilo recuperato dalla cache:', profileData)
+            } catch (e) {
+              console.error('❌ Errore parsing cache profilo:', e)
+              localStorage.removeItem(`profile-${currentUser.id}`)
+              profileData = await getProfile(currentUser.id)
+            }
+          } else {
+            profileData = await getProfile(currentUser.id)
+          }
         }
-        
+
         if (!mountedRef.current) {
           console.log('❌ Componente smontato durante il recupero del profilo')
           return
@@ -236,7 +255,6 @@ function AuthProvider({ children }) {
             authError: null
           })
         } else {
-          // Se non abbiamo il profilo, settiamo comunque l'utente base
           console.log('⚠️ Profilo non trovato, uso solo dati base utente')
           safeSetState({
             user: safeUser,
@@ -248,26 +266,6 @@ function AuthProvider({ children }) {
       } catch (e) {
         console.error('❌ Errore gestione profilo:', e)
         if (mountedRef.current) {
-          // In caso di errore, proviamo a usare i dati in cache se disponibili
-          const cachedProfile = localStorage.getItem(`profile-${currentUser.id}`)
-          if (cachedProfile) {
-            try {
-              const profileData = JSON.parse(cachedProfile)
-              console.log('🔄 Uso dati profilo dalla cache dopo errore:', profileData)
-              safeUser.nome = profileData.nome
-              safeUser.cognome = profileData.cognome
-              safeSetState({
-                user: safeUser,
-                isTrainer: profileData.role === 'trainer' || profileData.role === 'admin',
-                loading: false,
-                authError: null
-              })
-            } catch (e) {
-              console.error('❌ Errore parsing cache profilo dopo errore:', e)
-            }
-          }
-          
-          // Se non abbiamo dati in cache, settiamo l'utente base
           safeSetState({
             user: safeUser,
             isTrainer: false,
