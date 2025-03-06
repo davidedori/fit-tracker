@@ -111,6 +111,13 @@ const Register = () => {
       if (password !== confirmPassword) {
         throw new Error('Le password non corrispondono')
       }
+
+      // Verifica che nome e cognome siano stati inseriti
+      if (!nome || !cognome) {
+        throw new Error('Nome e cognome sono obbligatori')
+      }
+      
+      console.log('Inizio registrazione utente...')
       
       // Registra l'utente
       const { data, error } = await supabase.auth.signUp({
@@ -131,29 +138,39 @@ const Register = () => {
         console.log('Utente registrato con successo:', data.user.id)
         
         try {
+          console.log('Creazione profilo utente...')
           // Crea il profilo utente con il ruolo corretto
           const { error: profileError } = await supabase
             .from('user_profiles')
-            .upsert({
+            .insert({
               id: data.user.id,
-              role: inviteRole || 'user', // Usa il ruolo dell'invito se presente
+              role: inviteRole || 'user',
               nome,
               cognome,
-              trainer_id: inviteRole === 'trainer' ? null : trainerId // Imposta trainer_id solo per i clienti
+              trainer_id: inviteRole === 'trainer' ? null : trainerId,
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString()
             })
-            
+          
           if (profileError) {
             console.error('Errore nella creazione del profilo:', profileError)
-            // Non blocchiamo la registrazione se questo fallisce
-          } else {
-            console.log('Profilo utente creato con successo')
+            throw profileError
           }
+          
+          console.log('Profilo utente creato con successo')
         } catch (profileError) {
-          console.error('Eccezione nella creazione del profilo:', profileError)
-          // Non blocchiamo la registrazione se questo fallisce
+          console.error('Errore fatale nella creazione del profilo:', profileError)
+          // In caso di errore nella creazione del profilo, elimina l'utente appena creato
+          try {
+            await supabase.auth.admin.deleteUser(data.user.id)
+          } catch (deleteError) {
+            console.error('Errore nella pulizia dopo fallimento:', deleteError)
+          }
+          throw new Error('Errore nella creazione del profilo utente. La registrazione è stata annullata.')
         }
         
         try {
+          console.log('Aggiornamento stato invito...')
           // Aggiorna lo stato dell'invito
           const { error: inviteError } = await supabase
             .from('user_invitations')
