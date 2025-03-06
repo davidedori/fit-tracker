@@ -285,7 +285,8 @@ function AuthProvider({ children }) {
             isTrainer: isTrainerOrAdmin,
             loading: false,
             authError: null,
-            session
+            session,
+            initialized: true
           })
         } else {
           console.log('⚠️ Profilo non trovato, uso solo dati base utente')
@@ -294,7 +295,8 @@ function AuthProvider({ children }) {
             isTrainer: false,
             loading: false,
             authError: null,
-            session
+            session,
+            initialized: true
           })
         }
       } catch (e) {
@@ -304,29 +306,12 @@ function AuthProvider({ children }) {
           isTrainer: false,
           loading: false,
           authError: e.message,
-          session
+          session,
+          initialized: true
         })
       }
     } finally {
       authStateChangeRef.current = null
-    }
-  }
-
-  // Gestore della visibilità del documento
-  const handleVisibilityChange = () => {
-    if (document.visibilityState === 'visible') {
-      console.log('👁️ Documento tornato visibile')
-      // Annulla eventuali timeout precedenti
-      if (visibilityTimeoutRef.current) {
-        clearTimeout(visibilityTimeoutRef.current)
-      }
-      
-      // Aspetta un breve momento prima di refreshare lo stato
-      visibilityTimeoutRef.current = setTimeout(() => {
-        if (mountedRef.current) {
-          handleAuthStateChange('REFRESH', null)
-        }
-      }, 300)
     }
   }
 
@@ -345,7 +330,8 @@ function AuthProvider({ children }) {
           console.error('❌ Errore getSession:', error)
           safeSetState({
             authError: error.message,
-            loading: false
+            loading: false,
+            initialized: true
           })
           return
         }
@@ -367,7 +353,8 @@ function AuthProvider({ children }) {
         console.error('❌ Errore inizializzazione:', e)
         safeSetState({
           authError: e.message,
-          loading: false
+          loading: false,
+          initialized: true
         })
       } finally {
         initializingRef.current = false
@@ -377,7 +364,12 @@ function AuthProvider({ children }) {
     init()
 
     // Sottoscrizione agli eventi di auth
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(handleAuthStateChange)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      // Ignora gli eventi durante l'inizializzazione
+      if (!initializingRef.current) {
+        handleAuthStateChange(event, session)
+      }
+    })
 
     return () => {
       console.log('🧹 Pulizia AuthProvider')
