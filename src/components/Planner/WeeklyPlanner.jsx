@@ -6,7 +6,14 @@ import { useAuth } from '../../contexts/AuthContext'
 import { dayNames } from '../../constants/days'
 
 const WeeklyPlanner = ({ externalUserId = null }) => {
-  const { user } = useAuth()
+  const { user, isTrainer } = useAuth()
+  
+  // Assicuriamoci che l'oggetto user abbia tutte le proprietà necessarie
+  if (user) {
+    user.photoURL = user.photoURL || null;
+    user.displayName = user.displayName || null;
+  }
+  
   const [weeklyRoutine, setWeeklyRoutine] = useState({})
   const [currentDay, setCurrentDay] = useState(1)
   
@@ -58,7 +65,8 @@ const WeeklyPlanner = ({ externalUserId = null }) => {
       
       const exerciseData = {
         ...exerciseWithoutId,
-        user_id: userId,
+        // Manteniamo l'ID utente originale se presente, altrimenti usiamo l'ID dell'utente corrente
+        user_id: exerciseWithoutId.user_id || userId,
         day_of_week: exercise.day_of_week, // Non sottrarre 1, salva direttamente 1-7
         duration: exercise.mode === 'timer' ? Math.max(0, parseInt(exercise.duration) || 0) : 0,
         sets: exercise.mode === 'reps' ? (parseInt(exercise.sets) || 3) : 0,
@@ -99,16 +107,30 @@ const WeeklyPlanner = ({ externalUserId = null }) => {
       }
       
       for (const exercise of exercises) {
+        const exerciseData = {
+          name: exercise.name,
+          equipment: exercise.equipment || '',
+          body_part: exercise.body_part || '',
+          type: exercise.type || 'strength',
+          description: exercise.description || '',
+          mode: exercise.mode,
+          duration: exercise.mode === 'timer' ? parseInt(exercise.duration) || 0 : 0,
+          sets: exercise.mode === 'reps' ? parseInt(exercise.sets) || 3 : 0,
+          reps: exercise.mode === 'reps' ? parseInt(exercise.reps) || 10 : 0,
+          rest: parseInt(exercise.rest) || 0,
+          day_of_week: targetDayNum,
+          user_id: userId,
+          order_index: (weeklyRoutine[targetDayNum] || []).length
+        }
+
         const { error } = await supabase
           .from('exercises')
-          .insert({
-            ...exercise,
-            id: undefined,
-            day_of_week: targetDayNum, // Non sottrarre 1
-            user_id: userId,
-            order_index: (weeklyRoutine[targetDayNum] || []).length
-          })
-        if (error) console.error('Errore durante la duplicazione:', error)
+          .insert(exerciseData)
+
+        if (error) {
+          console.error('Errore durante la duplicazione:', error)
+          throw error
+        }
       }
       
       await fetchRoutine()
@@ -192,17 +214,52 @@ const WeeklyPlanner = ({ externalUserId = null }) => {
     }
   }
 
+  const handleEditExercise = async (updatedExercise) => {
+    try {
+      // Estraiamo solo i campi necessari per l'aggiornamento
+      const exerciseData = {
+        name: updatedExercise.name,
+        equipment: updatedExercise.equipment || '',
+        body_part: updatedExercise.body_part || '',
+        type: updatedExercise.type || 'strength',
+        description: updatedExercise.description || '',
+        mode: updatedExercise.mode,
+        duration: updatedExercise.mode === 'timer' ? Math.max(0, parseInt(updatedExercise.duration) || 0) : 0,
+        sets: updatedExercise.mode === 'reps' ? (parseInt(updatedExercise.sets) || 3) : 0,
+        reps: updatedExercise.mode === 'reps' ? (parseInt(updatedExercise.reps) || 10) : 0,
+        rest: parseInt(updatedExercise.rest) || 0,
+        day_of_week: updatedExercise.day_of_week,
+        order_index: updatedExercise.order_index
+      }
+
+      console.log('Tentativo di aggiornamento esercizio:', exerciseData)
+
+      const { error } = await supabase
+        .from('exercises')
+        .update(exerciseData)
+        .eq('id', updatedExercise.id)
+
+      if (error) throw error
+      
+      console.log('Esercizio aggiornato con successo')
+      await fetchRoutine()
+    } catch (error) {
+      console.error('Errore durante la modifica:', error)
+    }
+  }
+
   const handleDeleteExercise = async (exerciseId) => {
     try {
+      console.log('Tentativo di eliminazione esercizio:', exerciseId)
+      
       const { error } = await supabase
         .from('exercises')
         .delete()
         .eq('id', exerciseId)
-        .eq('user_id', userId)
 
       if (error) throw error
-
-      // Aggiorna lo stato locale dopo l'eliminazione
+      
+      console.log('Esercizio eliminato con successo')
       await fetchRoutine()
     } catch (error) {
       console.error('Errore durante l\'eliminazione:', error)
@@ -214,32 +271,6 @@ const WeeklyPlanner = ({ externalUserId = null }) => {
     const mins = Math.floor((seconds % 3600) / 60)
     const secs = seconds % 60
     return `${hrs.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`
-  }
-
-  const handleEditExercise = async (updatedExercise) => {
-    try {
-      const exerciseData = {
-        ...updatedExercise,
-        day_of_week: updatedExercise.day_of_week, // Non sottrarre 1
-        duration: updatedExercise.mode === 'timer' 
-          ? Math.max(0, parseInt(updatedExercise.duration) || 0)
-          : 0,
-        sets: updatedExercise.mode === 'reps' ? (parseInt(updatedExercise.sets) || 3) : 0,
-        reps: updatedExercise.mode === 'reps' ? (parseInt(updatedExercise.reps) || 10) : 0,
-        rest: parseInt(updatedExercise.rest) || 0
-      }
-
-      const { error } = await supabase
-        .from('exercises')
-        .update(exerciseData)
-        .eq('id', updatedExercise.id)
-        .eq('user_id', userId)
-
-      if (error) throw error
-      await fetchRoutine()
-    } catch (error) {
-      console.error('Errore durante la modifica:', error)
-    }
   }
 
   const parseTimeToSeconds = (timeStr) => {
@@ -261,16 +292,20 @@ const WeeklyPlanner = ({ externalUserId = null }) => {
         sets: exercise.mode === 'reps' ? parseInt(exercise.sets) || 3 : 0,
         reps: exercise.mode === 'reps' ? parseInt(exercise.reps) || 10 : 0,
         rest: parseInt(exercise.rest) || 0,
-        day_of_week: exercise.day_of_week, // Non sottrarre 1
-        user_id: userId,
+        day_of_week: exercise.day_of_week,
+        user_id: exercise.user_id || userId,
         order_index: (weeklyRoutine[exercise.day_of_week] || []).length
       }
+
+      console.log('Tentativo di duplicazione esercizio:', exerciseData)
 
       const { error } = await supabase
         .from('exercises')
         .insert(exerciseData)
 
       if (error) throw error
+      
+      console.log('Esercizio duplicato con successo')
       await fetchRoutine()
     } catch (error) {
       console.error('Errore durante la duplicazione dell\'esercizio:', error)
@@ -291,6 +326,7 @@ const WeeklyPlanner = ({ externalUserId = null }) => {
             onDeleteExercise={handleDeleteExercise}
             onEditExercise={handleEditExercise}
             onDuplicateExercise={handleDuplicateExercise}
+            externalUserId={externalUserId}
           />
         ))}
       </div>

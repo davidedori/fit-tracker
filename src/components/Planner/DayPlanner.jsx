@@ -14,7 +14,8 @@ const DayPlanner = ({
   onClear, 
   onDeleteExercise,
   onEditExercise,
-  onDuplicateExercise
+  onDuplicateExercise,
+  externalUserId = null
 }) => {
   const [showDuplicateModal, setShowDuplicateModal] = useState(false)
   const [editingExercise, setEditingExercise] = useState(null)
@@ -181,6 +182,7 @@ const DayPlanner = ({
               day={day}
               initialData={editingExercise}
               onSave={handleSave}
+              externalUserId={externalUserId}
             />
             <button 
               onClick={() => {

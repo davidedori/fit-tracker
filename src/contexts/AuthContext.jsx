@@ -9,9 +9,29 @@ const AuthContext = createContext({
   isTrainer: false
 })
 
-export const useAuth = () => useContext(AuthContext)
+// Funzione di utilità per assicurare che l'oggetto utente abbia tutte le proprietà necessarie
+const ensureUserProperties = (user) => {
+  if (!user) return null;
+  return {
+    ...user,
+    photoURL: user.photoURL || null,
+    displayName: user.displayName || null,
+    nome: user.nome || null,
+    cognome: user.cognome || null
+  };
+}
 
-export const AuthProvider = ({ children }) => {
+// Esporta l'hook useAuth come funzione nominata
+function useAuth() {
+  const context = useContext(AuthContext)
+  if (!context) {
+    throw new Error('useAuth deve essere usato all\'interno di un AuthProvider')
+  }
+  return context
+}
+
+// Esporta AuthProvider come funzione nominata
+function AuthProvider({ children }) {
   const [user, setUser] = useState(null)
   const [loading, setLoading] = useState(true)
   const [isTrainer, setIsTrainer] = useState(false)
@@ -86,11 +106,32 @@ export const AuthProvider = ({ children }) => {
       return false
     }
     
-    // SOLUZIONE TEMPORANEA: Imposta direttamente l'utente come trainer
-    // se corrisponde all'ID specificato
-    const isAdmin = userId === '2248ebaf-92e7-423d-907e-a8a7532e52d9'
-    console.log('Impostazione diretta isTrainer =', isAdmin)
-    return isAdmin
+    try {
+      // Verifica se l'utente ha il ruolo 'trainer' o 'admin' nella tabella user_profiles
+      const { data, error } = await supabase
+        .from('user_profiles')
+        .select('role')
+        .eq('id', userId)
+        .single()
+      
+      if (error) {
+        console.error('Errore nella verifica del ruolo:', error)
+        // Fallback per l'admin
+        const isAdmin = userId === '2248ebaf-92e7-423d-907e-a8a7532e52d9'
+        console.log('Fallback: imposto manualmente isTrainer =', isAdmin)
+        return isAdmin
+      }
+      
+      const isTrainerOrAdmin = data.role === 'trainer' || data.role === 'admin'
+      console.log('Ruolo utente:', data.role, 'isTrainerOrAdmin =', isTrainerOrAdmin)
+      return isTrainerOrAdmin
+    } catch (e) {
+      console.error('Eccezione nella verifica del ruolo:', e)
+      // Fallback per l'admin
+      const isAdmin = userId === '2248ebaf-92e7-423d-907e-a8a7532e52d9'
+      console.log('Fallback in eccezione: imposto manualmente isTrainer =', isAdmin)
+      return isAdmin
+    }
   }
 
   useEffect(() => {
@@ -115,29 +156,32 @@ export const AuthProvider = ({ children }) => {
         const currentUser = session?.user ?? null
         console.log('Utente corrente:', currentUser ? `ID: ${currentUser.id}` : 'Nessuno')
         
+        // Usa la funzione locale invece di window.ensureUserProperties
+        const safeUser = ensureUserProperties(currentUser);
+        
         if (isMounted) {
-          setUser(currentUser)
+          setUser(safeUser)
         }
         
-        if (currentUser && isMounted) {
+        if (safeUser && isMounted) {
           console.log('Verifica ruolo trainer per utente corrente')
           try {
             // Ottieni i dati del profilo utente
             const { data: profileData, error: profileError } = await supabase
               .from('user_profiles')
               .select('role, nome, cognome')
-              .eq('id', currentUser.id)
+              .eq('id', safeUser.id)
               .single()
             
             if (profileError) {
               console.error('Errore nel recupero del profilo:', profileError)
             } else if (profileData) {
               // Aggiungi nome e cognome all'oggetto utente
-              currentUser.nome = profileData.nome
-              currentUser.cognome = profileData.cognome
+              safeUser.nome = profileData.nome
+              safeUser.cognome = profileData.cognome
             }
             
-            const trainerStatus = await checkUserRole(currentUser.id)
+            const trainerStatus = await checkUserRole(safeUser.id)
             console.log('Stato trainer:', trainerStatus)
             if (isMounted) {
               setIsTrainer(trainerStatus)
@@ -147,7 +191,7 @@ export const AuthProvider = ({ children }) => {
             if (isMounted) {
               setAuthError(e.message)
               // Fallback
-              const isAdmin = currentUser.id === '2248ebaf-92e7-423d-907e-a8a7532e52d9'
+              const isAdmin = safeUser.id === '2248ebaf-92e7-423d-907e-a8a7532e52d9'
               console.log('Fallback in getSession: imposto manualmente isTrainer =', isAdmin)
               setIsTrainer(isAdmin)
             }
@@ -174,13 +218,16 @@ export const AuthProvider = ({ children }) => {
       const currentUser = session?.user ?? null
       console.log('Nuovo utente:', currentUser ? `ID: ${currentUser.id}` : 'Nessuno')
       
+      // Usa la funzione locale invece di window.ensureUserProperties
+      const safeUser = ensureUserProperties(currentUser);
+      
       if (isMounted) {
-        setUser(currentUser)
+        setUser(safeUser)
       }
       
-      if (currentUser && isMounted) {
+      if (safeUser && isMounted) {
         try {
-          const trainerStatus = await checkUserRole(currentUser.id)
+          const trainerStatus = await checkUserRole(safeUser.id)
           console.log('Nuovo stato trainer:', trainerStatus)
           if (isMounted) {
             setIsTrainer(trainerStatus)
@@ -190,7 +237,7 @@ export const AuthProvider = ({ children }) => {
           if (isMounted) {
             setAuthError(e.message)
             // Fallback
-            const isAdmin = currentUser.id === '2248ebaf-92e7-423d-907e-a8a7532e52d9'
+            const isAdmin = safeUser.id === '2248ebaf-92e7-423d-907e-a8a7532e52d9'
             console.log('Fallback in onAuthStateChange: imposto manualmente isTrainer =', isAdmin)
             setIsTrainer(isAdmin)
           }
@@ -230,4 +277,7 @@ export const AuthProvider = ({ children }) => {
       )}
     </AuthContext.Provider>
   )
-} 
+}
+
+// Esporta entrambi come named exports
+export { useAuth, AuthProvider } 

@@ -9,6 +9,13 @@ import { useAuth } from '../../contexts/AuthContext'
 
 const WorkoutMode = () => {
   const { user } = useAuth()
+  
+  // Assicuriamoci che l'oggetto user abbia tutte le proprietà necessarie
+  if (user) {
+    user.photoURL = user.photoURL || null;
+    user.displayName = user.displayName || null;
+  }
+  
   const navigate = useNavigate()
   const [currentDay, setCurrentDay] = useState(new Date().getDay() || 7)
   const [exercises, setExercises] = useState([])

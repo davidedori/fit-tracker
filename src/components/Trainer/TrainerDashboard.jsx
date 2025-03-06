@@ -55,11 +55,12 @@ const TrainerDashboard = () => {
       }
       
       console.log('Tabella user_profiles accessibile, recupero utenti')
-      // Ottieni tutti gli utenti con ruolo "user"
+      // Ottieni tutti gli utenti con ruolo "user" e trainer_id corrispondente all'utente corrente o null
       const { data, error } = await supabase
         .from('user_profiles')
-        .select('id, role, nome, cognome, created_at')
+        .select('id, role, nome, cognome, created_at, trainer_id')
         .eq('role', 'user')
+        .or(`trainer_id.eq.${user.id},trainer_id.is.null`) // Filtra per trainer_id uguale all'utente corrente o null
         .order('created_at', { ascending: false })
         
       if (error) {
@@ -80,6 +81,10 @@ const TrainerDashboard = () => {
           
           // Crea un array di promesse per ottenere le email e i dati di allenamento
           const clientPromises = data.map(async (client) => {
+            // Assicuriamoci che l'oggetto client abbia tutte le proprietà necessarie
+            client.photoURL = client.photoURL || null;
+            client.displayName = client.displayName || null;
+            
             // Ottieni l'email
             const { data: emailData, error: emailError } = await supabase.rpc('get_user_email', {
               user_id: client.id

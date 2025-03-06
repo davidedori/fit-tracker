@@ -13,11 +13,11 @@ import {
   Heart
 } from 'react-feather'
 
-const ExerciseForm = ({ day, onSave, initialData = null }) => {
+const ExerciseForm = ({ day, onSave, initialData = null, externalUserId = null }) => {
   const { user } = useAuth()
   const [exercise, setExercise] = useState(() => {
     const defaultState = {
-      user_id: user.id,
+      user_id: externalUserId || user.id,
       name: '',
       equipment: '',
       body_part: '',

@@ -9,6 +9,13 @@ import WorkoutStats from './WorkoutStats';
 
 const WorkoutHistory = ({ externalUserId }) => {
   const { user } = useAuth();
+  
+  // Assicuriamoci che l'oggetto user abbia tutte le proprietà necessarie
+  if (user) {
+    user.photoURL = user.photoURL || null;
+    user.displayName = user.displayName || null;
+  }
+  
   const [workoutLogs, setWorkoutLogs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('all');

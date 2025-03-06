@@ -7,7 +7,16 @@ import Input from '../common/Input'
 
 const InviteUsers = () => {
   const { user } = useAuth()
+  const [isAdmin, setIsAdmin] = useState(false)
+  
+  // Assicuriamoci che l'oggetto user abbia tutte le proprietà necessarie
+  if (user) {
+    user.photoURL = user.photoURL || null;
+    user.displayName = user.displayName || null;
+  }
+  
   const [email, setEmail] = useState('')
+  const [inviteRole, setInviteRole] = useState('user')
   const [invitations, setInvitations] = useState([])
   const [loading, setLoading] = useState(true)
   const [sending, setSending] = useState(false)
@@ -25,12 +34,31 @@ const InviteUsers = () => {
 
   // Funzione per ottenere il base URL corretto
   const getBaseUrl = () => {
-    return window.getBaseUrl();
+    // Usa direttamente window.location.origin e BASE_PATH
+    const BASE_PATH = '/fit-tracker';
+    return `${window.location.origin}${BASE_PATH}`;
   };
 
   useEffect(() => {
+    checkAdminRole()
     fetchInvitations()
   }, [])
+
+  const checkAdminRole = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('user_profiles')
+        .select('role')
+        .eq('id', user.id)
+        .single()
+      
+      if (error) throw error
+      
+      setIsAdmin(data.role === 'admin')
+    } catch (error) {
+      console.error('Errore nella verifica del ruolo admin:', error)
+    }
+  }
 
   const fetchInvitations = async () => {
     setLoading(true)
@@ -47,6 +75,10 @@ const InviteUsers = () => {
       
       // Aggiungiamo un flag per gli inviti scaduti
       const processedData = data.map(invite => {
+        // Assicuriamoci che l'oggetto invite abbia tutte le proprietà necessarie
+        invite.photoURL = invite.photoURL || null;
+        invite.displayName = invite.displayName || null;
+        
         const isExpired = invite.expires_at && new Date(invite.expires_at) < new Date();
         return {
           ...invite,
@@ -84,6 +116,10 @@ const InviteUsers = () => {
   const filteredAndSortedInvitations = React.useMemo(() => {
     // Prima filtra per termine di ricerca e stato
     let filteredResults = invitations.filter(invite => {
+      // Assicuriamoci che l'oggetto invite abbia tutte le proprietà necessarie
+      invite.photoURL = invite.photoURL || null;
+      invite.displayName = invite.displayName || null;
+      
       const matchesSearch = invite.email.toLowerCase().includes(searchTerm.toLowerCase().trim());
       
       // Filtra per stato
@@ -152,15 +188,27 @@ const InviteUsers = () => {
             email, 
             token,
             invited_by: user.id,
-            expires_at: expiresAt.toISOString() // Aggiungi la data di scadenza
+            expires_at: expiresAt.toISOString(),
+            invite_role: inviteRole
           }
         ])
         .select()
       
       if (error) throw error
       
+      // Assicuriamoci che l'oggetto data abbia tutte le proprietà necessarie
+      if (data && data.length > 0) {
+        data.forEach(item => {
+          item.photoURL = item.photoURL || null;
+          item.displayName = item.displayName || null;
+        });
+      }
+      
       // Crea il link di invito
-      const inviteUrl = `${getBaseUrl()}/#/register?token=${token}`
+      const baseUrl = getBaseUrl();
+      console.log('Base URL:', baseUrl);
+      const inviteUrl = `${baseUrl}/#/register?token=${token}`;
+      console.log('Link di invito creato:', inviteUrl);
       setInviteLink(inviteUrl)
       
       // Resetta il form
@@ -177,10 +225,27 @@ const InviteUsers = () => {
 
   const copyToClipboard = () => {
     if (linkRef.current) {
-      linkRef.current.select()
-      document.execCommand('copy')
-      setCopied(true)
-      setTimeout(() => setCopied(false), 2000)
+      try {
+        // Usa l'API Clipboard moderna
+        navigator.clipboard.writeText(inviteLink)
+          .then(() => {
+            console.log('Link copiato negli appunti:', inviteLink);
+            setCopied(true);
+          })
+          .catch(err => {
+            console.error('Errore durante la copia negli appunti:', err);
+            // Fallback al metodo vecchio
+            linkRef.current.select();
+            document.execCommand('copy');
+            setCopied(true);
+          });
+      } catch (err) {
+        console.error('Errore durante la copia negli appunti:', err);
+        // Fallback al metodo vecchio
+        linkRef.current.select();
+        document.execCommand('copy');
+        setCopied(true);
+      }
     }
   }
 
@@ -203,10 +268,11 @@ const InviteUsers = () => {
   }
   
   const copyInviteLink = (inviteId, token) => {
-    const inviteUrl = `${getBaseUrl()}/#/register?token=${token}`
-    navigator.clipboard.writeText(inviteUrl)
-    setCopiedInviteId(inviteId)
-    setTimeout(() => setCopiedInviteId(null), 2000)
+    const baseUrl = getBaseUrl();
+    const inviteUrl = `${baseUrl}/#/register?token=${token}`;
+    console.log('Link di invito copiato:', inviteUrl);
+    navigator.clipboard.writeText(inviteUrl);
+    setCopiedInviteId(inviteId);
   }
 
   const handleRenewInvite = async (inviteId) => {
@@ -228,9 +294,6 @@ const InviteUsers = () => {
       // Aggiorna la lista degli inviti
       fetchInvitations()
       setSuccess('Invito rinnovato con successo')
-      
-      // Nascondi il messaggio di successo dopo 3 secondi
-      setTimeout(() => setSuccess(null), 3000)
     } catch (error) {
       console.error('Errore durante il rinnovo dell\'invito:', error)
       setError('Impossibile rinnovare l\'invito: ' + error.message)
@@ -240,7 +303,7 @@ const InviteUsers = () => {
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold">Invita Nuovi Clienti</h1>
+        <h1 className="text-2xl font-bold">Invita {isAdmin ? 'Nuovi Utenti' : 'Nuovi Clienti'}</h1>
         <button 
           onClick={fetchInvitations} 
           className="p-2 text-gray-500 hover:text-blue-600 transition-colors rounded-full hover:bg-gray-100"
@@ -251,14 +314,26 @@ const InviteUsers = () => {
       </div>
       
       {error && (
-        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
-          {error}
+        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4 flex justify-between items-center">
+          <span>{error}</span>
+          <button 
+            onClick={() => setError(null)} 
+            className="text-red-700 hover:text-red-900"
+          >
+            <X size={18} />
+          </button>
         </div>
       )}
       
       {success && (
-        <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded mb-4">
-          {success}
+        <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded mb-4 flex justify-between items-center">
+          <span>{success}</span>
+          <button 
+            onClick={() => setSuccess(null)} 
+            className="text-green-700 hover:text-green-900"
+          >
+            <X size={18} />
+          </button>
         </div>
       )}
       
@@ -274,10 +349,22 @@ const InviteUsers = () => {
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="Email del cliente da invitare"
+                placeholder="Email dell'utente da invitare"
                 required
               />
             </div>
+            {isAdmin && (
+              <div className="w-48">
+                <select
+                  value={inviteRole}
+                  onChange={(e) => setInviteRole(e.target.value)}
+                  className="w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="user">Cliente</option>
+                  <option value="trainer">Trainer</option>
+                </select>
+              </div>
+            )}
             <Button
               type="submit"
               variant="primary"

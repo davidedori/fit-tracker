@@ -5,6 +5,13 @@ import { User, Calendar, Activity, BarChart2, Users, Share2, Link as LinkIcon } 
 
 const Layout = () => {
   const { user, isTrainer } = useAuth()
+  
+  // Assicuriamoci che l'oggetto user abbia tutte le proprietà necessarie
+  if (user) {
+    user.photoURL = user.photoURL || null;
+    user.displayName = user.displayName || null;
+  }
+  
   const location = useLocation()
 
   useEffect(() => {

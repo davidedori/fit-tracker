@@ -22,6 +22,8 @@ const Register = () => {
   const [invitedEmail, setInvitedEmail] = useState('')
   const [token, setToken] = useState('')
   const [checkingInvitation, setCheckingInvitation] = useState(true)
+  const [trainerId, setTrainerId] = useState(null)
+  const [inviteRole, setInviteRole] = useState('user')
 
   // Controlla se l'utente arriva da un link di invito
   useEffect(() => {
@@ -66,6 +68,9 @@ const Register = () => {
               setIsInvited(true);
               setInvitedEmail(inviteData.email);
               setEmail(inviteData.email);
+              // Salva l'ID del trainer che ha inviato l'invito e il ruolo dell'invito
+              setTrainerId(inviteData.invited_by);
+              setInviteRole(inviteData.invite_role || 'user');
             }
           } else {
             console.log('Nessun invito trovato per il token:', inviteToken)
@@ -126,14 +131,15 @@ const Register = () => {
         console.log('Utente registrato con successo:', data.user.id)
         
         try {
-          // Crea il profilo utente
+          // Crea il profilo utente con il ruolo corretto
           const { error: profileError } = await supabase
             .from('user_profiles')
             .upsert({
               id: data.user.id,
-              role: 'user',
+              role: inviteRole || 'user', // Usa il ruolo dell'invito se presente
               nome,
-              cognome
+              cognome,
+              trainer_id: inviteRole === 'trainer' ? null : trainerId // Imposta trainer_id solo per i clienti
             })
             
           if (profileError) {

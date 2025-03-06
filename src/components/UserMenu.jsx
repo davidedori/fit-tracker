@@ -4,6 +4,13 @@ import { supabase } from '../services/supabase'
 
 const UserMenu = () => {
   const { user } = useAuth()
+  
+  // Assicuriamoci che l'oggetto user abbia tutte le proprietà necessarie
+  if (user) {
+    user.photoURL = user.photoURL || null;
+    user.displayName = user.displayName || null;
+  }
+  
   const [isOpen, setIsOpen] = useState(false)
 
   const handleLogout = async () => {

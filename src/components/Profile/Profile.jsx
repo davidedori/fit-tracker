@@ -10,6 +10,13 @@ import { Link } from 'react-router-dom'
 
 const Profile = () => {
   const { user, loading, signOut, isTrainer } = useAuth()
+  
+  // Assicuriamoci che l'oggetto user abbia tutte le proprietà necessarie
+  if (user) {
+    user.photoURL = user.photoURL || null;
+    user.displayName = user.displayName || null;
+  }
+  
   const [stats, setStats] = useState({
     totalWorkouts: 0,
     totalExercises: 0,
@@ -121,6 +128,13 @@ const Profile = () => {
         .single()
       
       if (error) throw error
+      
+      // Assicuriamoci che l'oggetto data abbia tutte le proprietà necessarie
+      if (data) {
+        data.photoURL = data.photoURL || null;
+        data.displayName = data.displayName || null;
+      }
+      
       setUserProfile(data)
     } catch (error) {
       console.error('Errore durante il recupero del profilo:', error)

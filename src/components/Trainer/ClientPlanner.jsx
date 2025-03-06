@@ -58,6 +58,18 @@ const ClientPlanner = () => {
         return
       }
       
+      // Assicuriamoci che l'oggetto profileData abbia tutte le proprietà necessarie
+      profileData.photoURL = profileData.photoURL || null;
+      profileData.displayName = profileData.displayName || null;
+      
+      // Verifica che il cliente appartenga al trainer corrente
+      if (profileData.trainer_id && profileData.trainer_id !== user.id) {
+        console.error('Accesso non autorizzato: il cliente non appartiene a questo trainer')
+        setError('Non hai i permessi per gestire questo cliente')
+        setLoading(false)
+        return
+      }
+      
       // Recupera l'email dell'utente
       const { data: emailData, error: emailError } = await supabase
         .rpc('get_user_email', { user_id: clientId })
