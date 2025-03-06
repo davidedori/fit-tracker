@@ -111,6 +111,39 @@ function AuthProvider({ children }) {
     mountedRef.current = true
     let initTimeoutId = null
 
+    // Funzione per gestire il callback di autenticazione
+    const handleAuthCallback = async () => {
+      try {
+        console.log('🔑 Gestione callback di autenticazione')
+        const hashParams = new URLSearchParams(window.location.hash.substring(window.location.hash.indexOf('?')))
+        const accessToken = hashParams.get('access_token')
+        const refreshToken = hashParams.get('refresh_token')
+
+        if (accessToken && refreshToken) {
+          console.log('🎫 Token trovati, imposto la sessione')
+          const { data: { session }, error } = await supabase.auth.setSession({
+            access_token: accessToken,
+            refresh_token: refreshToken
+          })
+
+          if (error) {
+            console.error('❌ Errore impostazione sessione:', error)
+            window.location.href = `${window.location.origin}${window.location.pathname}#/login`
+            return
+          }
+
+          if (session) {
+            console.log('✅ Sessione impostata correttamente')
+            window.location.href = `${window.location.origin}${window.location.pathname}#/`
+            return
+          }
+        }
+      } catch (e) {
+        console.error('❌ Errore durante la gestione del callback:', e)
+        window.location.href = `${window.location.origin}${window.location.pathname}#/login`
+      }
+    }
+
     const handleAuthStateChange = async (event, session) => {
       console.log('🔔 Evento auth:', event, 'Sessione:', session ? 'presente' : 'assente')
       
@@ -128,6 +161,12 @@ function AuthProvider({ children }) {
       // Gestione speciale per il processo di conferma email
       const isEmailConfirmation = window.location.hash.includes('#/auth/callback')
       
+      if (isEmailConfirmation) {
+        console.log('📧 Rilevato processo di conferma email')
+        await handleAuthCallback()
+        return
+      }
+
       if (!session) {
         console.log('⚠️ Nessuna sessione, reset stato')
         safeSetState({
@@ -206,16 +245,6 @@ function AuthProvider({ children }) {
             authError: null
           })
         }
-
-        // Se siamo nel processo di conferma email e abbiamo completato il caricamento,
-        // reindirizza alla home
-        if (isEmailConfirmation) {
-          console.log('✅ Conferma email completata, reindirizzo alla home')
-          // Usiamo un breve timeout per assicurarci che lo stato sia aggiornato
-          setTimeout(() => {
-            window.location.href = `${window.location.origin}${window.location.pathname}#/`
-          }, 100)
-        }
       } catch (e) {
         console.error('❌ Errore gestione profilo:', e)
         if (mountedRef.current) {
@@ -245,20 +274,20 @@ function AuthProvider({ children }) {
             loading: false,
             authError: e.message
           })
-
-          // Se siamo nel processo di conferma email, reindirizza comunque alla home
-          if (isEmailConfirmation) {
-            console.log('✅ Conferma email completata (con errori), reindirizzo alla home')
-            setTimeout(() => {
-              window.location.href = `${window.location.origin}${window.location.pathname}#/`
-            }, 100)
-          }
         }
       }
     }
 
     // Inizializzazione con gestione timeout
     const init = async () => {
+      const isEmailConfirmation = window.location.hash.includes('#/auth/callback')
+      
+      if (isEmailConfirmation) {
+        console.log('📧 Inizializzazione con conferma email')
+        await handleAuthCallback()
+        return
+      }
+
       // Usiamo più timeout brevi invece di uno lungo
       const startTimeout = () => {
         if (initTimeoutId) clearTimeout(initTimeoutId)
