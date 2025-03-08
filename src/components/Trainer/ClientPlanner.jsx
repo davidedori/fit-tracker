@@ -25,6 +25,7 @@ const ClientPlanner = () => {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [activeTab, setActiveTab] = useState('workoutHistory')
+  const [isAdmin, setIsAdmin] = useState(false)
   const [stats, setStats] = useState({
     plannedDays: 0,
     totalExercises: 0,
@@ -35,9 +36,32 @@ const ClientPlanner = () => {
 
   useEffect(() => {
     if (isTrainer && clientId) {
-      fetchClientData()
+      checkAdminRole()
     }
   }, [clientId, isTrainer])
+  
+  // Effetto separato per caricare i dati del cliente quando cambia isAdmin
+  useEffect(() => {
+    if (isTrainer && clientId) {
+      fetchClientData()
+    }
+  }, [isAdmin, clientId, isTrainer])
+
+  const checkAdminRole = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('user_profiles')
+        .select('role')
+        .eq('id', user.id)
+        .single()
+      
+      if (error) throw error
+      
+      setIsAdmin(data.role === 'admin')
+    } catch (error) {
+      console.error('Errore verifica ruolo admin:', error)
+    }
+  }
 
   const fetchClientData = async () => {
     setLoading(true)
@@ -58,12 +82,29 @@ const ClientPlanner = () => {
         return
       }
       
+      // Se il cliente ha un trainer, recupera i suoi dati
+      if (profileData.trainer_id) {
+        const { data: trainerData, error: trainerError } = await supabase
+          .from('user_profiles')
+          .select('nome, cognome')
+          .eq('id', profileData.trainer_id)
+          .single()
+        
+        if (!trainerError && trainerData) {
+          profileData.trainer = trainerData
+        } else {
+          profileData.trainer = null
+        }
+      } else {
+        profileData.trainer = null
+      }
+      
       // Assicuriamoci che l'oggetto profileData abbia tutte le proprietà necessarie
       profileData.photoURL = profileData.photoURL || null;
       profileData.displayName = profileData.displayName || null;
       
-      // Verifica che il cliente appartenga al trainer corrente
-      if (profileData.trainer_id && profileData.trainer_id !== user.id) {
+      // Verifica che il cliente appartenga al trainer corrente o che l'utente sia admin
+      if (!isAdmin && profileData.trainer_id && profileData.trainer_id !== user.id) {
         console.error('Accesso non autorizzato: il cliente non appartiene a questo trainer')
         setError('Non hai i permessi per gestire questo cliente')
         setLoading(false)
@@ -236,6 +277,12 @@ const ClientPlanner = () => {
                     <CalendarIcon size={14} className="mr-1" />
                     <span>Registrato il {new Date(clientData.profile.created_at).toLocaleDateString('it-IT')}</span>
                   </div>
+                  {clientData.profile.trainer && (
+                    <div className="flex items-center text-gray-600 mt-1">
+                      <User size={14} className="mr-1" />
+                      <span>Trainer: {clientData.profile.trainer.nome} {clientData.profile.trainer.cognome}</span>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>

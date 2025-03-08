@@ -41,8 +41,12 @@ const InviteUsers = () => {
 
   useEffect(() => {
     checkAdminRole()
-    fetchInvitations()
   }, [])
+  
+  // Effetto separato per caricare gli inviti quando cambia isAdmin
+  useEffect(() => {
+    fetchInvitations()
+  }, [isAdmin])
 
   const checkAdminRole = async () => {
     try {
@@ -56,40 +60,68 @@ const InviteUsers = () => {
       
       setIsAdmin(data.role === 'admin')
     } catch (error) {
-      console.error('Errore nella verifica del ruolo admin:', error)
+      console.error('Errore verifica ruolo admin:', error)
     }
   }
 
   const fetchInvitations = async () => {
-    setLoading(true)
-    setError(null)
-    
     try {
-      const { data, error } = await supabase
+      setLoading(true)
+      
+      // Query base per gli inviti
+      const query = supabase
         .from('user_invitations')
         .select('*')
-        .eq('invited_by', user.id)
         .order('created_at', { ascending: false })
-      
+
+      // Se non è admin, filtra solo gli inviti creati dall'utente
+      if (!isAdmin) {
+        query.eq('invited_by', user.id)
+      }
+
+      const { data, error } = await query
+
       if (error) throw error
       
-      // Aggiungiamo un flag per gli inviti scaduti
-      const processedData = data.map(invite => {
-        // Assicuriamoci che l'oggetto invite abbia tutte le proprietà necessarie
-        invite.photoURL = invite.photoURL || null;
-        invite.displayName = invite.displayName || null;
+      // Recupera i dati dei trainer che hanno creato gli inviti
+      if (data && data.length > 0) {
+        // Raccogli tutti gli ID dei trainer
+        const trainerIds = data
+          .filter(invite => invite.invited_by)
+          .map(invite => invite.invited_by)
         
-        const isExpired = invite.expires_at && new Date(invite.expires_at) < new Date();
-        return {
-          ...invite,
-          is_expired: isExpired
-        };
-      });
+        // Se ci sono trainer da recuperare
+        if (trainerIds.length > 0) {
+          const { data: trainersData, error: trainersError } = await supabase
+            .from('user_profiles')
+            .select('id, nome, cognome')
+            .in('id', trainerIds)
+          
+          if (trainersError) {
+            console.error('Errore recupero trainer:', trainersError)
+          } else if (trainersData) {
+            // Crea un dizionario di trainer per un accesso più veloce
+            const trainersMap = {}
+            trainersData.forEach(trainer => {
+              trainersMap[trainer.id] = trainer
+            })
+            
+            // Aggiungi i dati del trainer a ciascun invito
+            data.forEach(invite => {
+              if (invite.invited_by && trainersMap[invite.invited_by]) {
+                invite.trainer = trainersMap[invite.invited_by]
+              } else {
+                invite.trainer = null
+              }
+            })
+          }
+        }
+      }
       
-      setInvitations(processedData || [])
+      setInvitations(data || [])
     } catch (error) {
-      console.error('Errore durante il recupero degli inviti:', error)
-      setError('Impossibile caricare gli inviti')
+      console.error('Errore recupero inviti:', error)
+      setError('Errore nel recupero degli inviti')
     } finally {
       setLoading(false)
     }
@@ -451,6 +483,11 @@ const InviteUsers = () => {
                   <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Email
                   </th>
+                  {isAdmin && (
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Trainer
+                    </th>
+                  )}
                   <th 
                     scope="col" 
                     className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
@@ -496,6 +533,11 @@ const InviteUsers = () => {
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                       {invite.email}
                     </td>
+                    {isAdmin && (
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        {invite.trainer ? `${invite.trainer.nome} ${invite.trainer.cognome}` : 'N/D'}
+                      </td>
+                    )}
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                       {new Date(invite.created_at).toLocaleDateString('it-IT', {
                         day: '2-digit',

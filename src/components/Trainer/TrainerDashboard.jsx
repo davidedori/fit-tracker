@@ -20,6 +20,7 @@ const TrainerDashboard = () => {
   const [deletingClient, setDeletingClient] = useState(null)
   const [isDeleting, setIsDeleting] = useState(false)
   const [showDeleteModal, setShowDeleteModal] = useState(false)
+  const [isAdmin, setIsAdmin] = useState(false)
   const navigate = useNavigate()
 
   useEffect(() => {
@@ -27,12 +28,34 @@ const TrainerDashboard = () => {
     console.log('Stato trainer:', isTrainer)
     console.log('Utente:', user ? `ID: ${user.id}` : 'Nessuno')
     
-    fetchClients()
+    checkAdminRole()
     
     return () => {
       console.log('TrainerDashboard smontato')
     }
   }, [])
+  
+  // Effetto separato per caricare i clienti quando cambia isAdmin
+  useEffect(() => {
+    console.log('Stato admin cambiato:', isAdmin)
+    fetchClients()
+  }, [isAdmin])
+
+  const checkAdminRole = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('user_profiles')
+        .select('role')
+        .eq('id', user.id)
+        .single()
+      
+      if (error) throw error
+      
+      setIsAdmin(data.role === 'admin')
+    } catch (error) {
+      console.error('Errore verifica ruolo admin:', error)
+    }
+  }
 
   const fetchClients = async () => {
     console.log('fetchClients iniziato')
@@ -55,19 +78,58 @@ const TrainerDashboard = () => {
       }
       
       console.log('Tabella user_profiles accessibile, recupero utenti')
-      // Ottieni tutti gli utenti con ruolo "user" e trainer_id corrispondente all'utente corrente o null
-      const { data, error } = await supabase
+      // Se admin recupera tutti gli utenti, altrimenti solo quelli assegnati
+      let query = supabase
         .from('user_profiles')
-        .select('id, role, nome, cognome, created_at, trainer_id')
+        .select('*')
         .eq('role', 'user')
-        .or(`trainer_id.eq.${user.id},trainer_id.is.null`) // Filtra per trainer_id uguale all'utente corrente o null
-        .order('created_at', { ascending: false })
+
+      if (!isAdmin) {
+        query = query.eq('trainer_id', user.id)
+      }
+
+      const { data, error } = await query.order('created_at', { ascending: false })
         
       if (error) {
         console.error('Errore durante il recupero dei clienti:', error)
         setError(`Errore recupero: ${error.message}`)
         setLoading(false)
         return
+      }
+      
+      // Recupera i dati dei trainer
+      if (data && data.length > 0) {
+        // Raccogli tutti gli ID dei trainer
+        const trainerIds = data
+          .filter(client => client.trainer_id)
+          .map(client => client.trainer_id)
+        
+        // Se ci sono trainer da recuperare
+        if (trainerIds.length > 0) {
+          const { data: trainersData, error: trainersError } = await supabase
+            .from('user_profiles')
+            .select('id, nome, cognome')
+            .in('id', trainerIds)
+          
+          if (trainersError) {
+            console.error('Errore recupero trainer:', trainersError)
+          } else if (trainersData) {
+            // Crea un dizionario di trainer per un accesso più veloce
+            const trainersMap = {}
+            trainersData.forEach(trainer => {
+              trainersMap[trainer.id] = trainer
+            })
+            
+            // Aggiungi i dati del trainer a ciascun cliente
+            data.forEach(client => {
+              if (client.trainer_id && trainersMap[client.trainer_id]) {
+                client.trainer = trainersMap[client.trainer_id]
+              } else {
+                client.trainer = null
+              }
+            })
+          }
+        }
       }
       
       console.log('Dati clienti ricevuti:', data)
@@ -431,6 +493,11 @@ const TrainerDashboard = () => {
                       <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Email
                       </th>
+                      {isAdmin && (
+                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Trainer
+                        </th>
+                      )}
                       <th 
                         scope="col" 
                         className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
@@ -486,6 +553,11 @@ const TrainerDashboard = () => {
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                           {client.email}
                         </td>
+                        {isAdmin && (
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            {client.trainer ? `${client.trainer.nome} ${client.trainer.cognome}` : 'Non assegnato'}
+                          </td>
+                        )}
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                           {new Date(client.created_at).toLocaleDateString('it-IT')}
                         </td>
